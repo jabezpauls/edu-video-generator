@@ -1,0 +1,11 @@
+{
+  "name": "educational-video-skill",
+  "private": true,
+  "description": "Dev tooling for the educational-video Claude Code skill",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/node",
+    "test:py": "uv run --with pytest pytest tests/py"
+  },
+  "engines": { "node": ">=20" }
+}
