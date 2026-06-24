@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Validate storyboard.json. Exits non-zero with field errors if invalid.
 
-Uses jsonschema if available; otherwise falls back to a built-in structural check
-(no extra install needed). Usage: validate_storyboard.py <project-dir>
+Pure-stdlib structural check (no extra install needed). The checks are exposed as
+functions (`check`, `manual_check`) so they can be unit-tested and reused.
+
+Usage: validate_storyboard.py <project-dir>
 """
 import json
 import os
@@ -11,6 +13,7 @@ import sys
 ALLOWED_POS = {"center", "top", "bottom", "left", "right",
                "top-left", "top-right", "bottom-left", "bottom-right"}
 ALLOWED_KIND = {"equation", "text", "shape", "image", "code", "chart", "axes"}
+ENGINES = ("manim", "remotion")
 
 
 def fail(errs):
@@ -20,22 +23,37 @@ def fail(errs):
     sys.exit(1)
 
 
-def manual_check(sb) -> list:
-    errs = []
-    req_top = ["title", "engine", "fps", "target_duration_s", "scenes"]
-    for k in req_top:
+def _num(value):
+    """Return value as float, or None if it is not a real number."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def check(sb) -> tuple:
+    """Return (errors, warnings) for a parsed storyboard."""
+    errs, warns = [], []
+    if not isinstance(sb, dict):
+        return ["storyboard must be a JSON object"], warns
+
+    for k in ("title", "engine", "fps", "target_duration_s", "scenes"):
         if k not in sb:
             errs.append(f"missing top-level field: {k}")
-    if sb.get("engine") not in ("manim", "remotion", None):
-        errs.append(f"engine must be manim|remotion, got {sb.get('engine')!r}")
+    if sb.get("engine") not in (*ENGINES, None):
+        errs.append(f"engine must be {'|'.join(ENGINES)}, got {sb.get('engine')!r}")
+
     scenes = sb.get("scenes", [])
     if not isinstance(scenes, list) or not scenes:
         errs.append("scenes must be a non-empty array")
-        return errs
+        return errs, warns
+
     ids = set()
     total = 0.0
     for i, sc in enumerate(scenes):
         loc = f"scene[{i}]"
+        if not isinstance(sc, dict):
+            errs.append(f"{loc}: must be an object")
+            continue
         for k in ("id", "narration", "elements", "beats", "est_duration_s"):
             if k not in sc:
                 errs.append(f"{loc}: missing field {k}")
@@ -43,28 +61,53 @@ def manual_check(sb) -> list:
         if sid in ids:
             errs.append(f"{loc}: duplicate id {sid!r}")
         ids.add(sid)
-        total += float(sc.get("est_duration_s", 0) or 0)
+
+        est = sc.get("est_duration_s", 0)
+        if est is None:
+            est = 0
+        if _num(est) is None:
+            errs.append(f"{loc}: est_duration_s must be a number, got {est!r}")
+        else:
+            total += _num(est)
+
         for j, el in enumerate(sc.get("elements", []) or []):
+            if not isinstance(el, dict):
+                errs.append(f"{loc}.elements[{j}]: must be an object")
+                continue
             if el.get("kind") not in ALLOWED_KIND:
                 errs.append(f"{loc}.elements[{j}]: bad kind {el.get('kind')!r}")
             if "position" in el and el["position"] not in ALLOWED_POS:
                 errs.append(f"{loc}.elements[{j}]: bad position {el.get('position')!r}")
-        beats = sc.get("beats", []) or []
+
         last_t = -1.0
-        for j, b in enumerate(beats):
-            if "t" not in b or "action" not in b:
-                errs.append(f"{loc}.beats[{j}]: needs t and action")
+        for j, b in enumerate(sc.get("beats", []) or []):
+            bloc = f"{loc}.beats[{j}]"
+            if not isinstance(b, dict):
+                errs.append(f"{bloc}: must be an object")
                 continue
-            if float(b["t"]) < last_t:
-                errs.append(f"{loc}.beats[{j}]: t not in ascending order")
-            last_t = float(b["t"])
-    target = float(sb.get("target_duration_s", 0) or 0)
+            if "t" not in b or "action" not in b:
+                errs.append(f"{bloc}: needs t and action")
+                continue
+            t = _num(b["t"])
+            if t is None:
+                errs.append(f"{bloc}: t must be a number, got {b['t']!r}")
+                continue
+            if t < last_t:
+                errs.append(f"{bloc}: t not in ascending order")
+            last_t = t
+
+    target = _num(sb.get("target_duration_s", 0)) or 0.0
     if target > 0:
         lo, hi = target * 0.85, target * 1.15
         if not (lo <= total <= hi):
             errs.append(f"sum of est_duration_s ({total:.0f}s) outside +/-15% of "
                         f"target ({target:.0f}s)")
-    return errs
+    return errs, warns
+
+
+def manual_check(sb) -> list:
+    """Errors only (kept for callers that don't care about warnings)."""
+    return check(sb)[0]
 
 
 def main() -> int:
@@ -79,11 +122,13 @@ def main() -> int:
         except json.JSONDecodeError as e:
             fail([f"JSON parse error: {e}"])
 
-    errs = manual_check(sb)
+    errs, warns = check(sb)
+    for w in warns:
+        print(f"  warning: {w}", file=sys.stderr)
     if errs:
         fail(errs)
-    print(f"storyboard OK: {len(sb['scenes'])} scenes, "
-          f"~{sum(float(s.get('est_duration_s',0) or 0) for s in sb['scenes']):.0f}s, "
+    total = sum(float(s.get("est_duration_s", 0) or 0) for s in sb["scenes"])
+    print(f"storyboard OK: {len(sb['scenes'])} scenes, ~{total:.0f}s, "
           f"engine={sb.get('engine')}")
     return 0
 

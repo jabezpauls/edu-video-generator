@@ -102,3 +102,17 @@ def test_cli_bad_json(tmp_path):
     r = run_cli(tmp_path)
     assert r.returncode == 1
     assert "JSON parse error" in r.stderr
+
+
+def test_non_numeric_values_are_errors_not_crashes(validator, v1_storyboard):
+    v1_storyboard["scenes"][0]["beats"][0]["t"] = "soon"
+    v1_storyboard["scenes"][1]["est_duration_s"] = "ten"
+    errs = validator.manual_check(v1_storyboard)
+    assert any("t must be a number" in e for e in errs)
+    assert any("est_duration_s must be a number" in e for e in errs)
+
+
+def test_non_object_inputs(validator, v1_storyboard):
+    assert validator.manual_check([]) == ["storyboard must be a JSON object"]
+    v1_storyboard["scenes"][0] = "scene one"
+    assert any("must be an object" in e for e in validator.manual_check(v1_storyboard))
