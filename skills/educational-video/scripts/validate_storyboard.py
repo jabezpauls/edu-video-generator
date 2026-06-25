@@ -21,6 +21,10 @@ DEFAULT_FORMATS = {"lesson": ["16x9"], "short": ["9x16"]}
 PRESET_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 SHORT_RANGE_S = (30, 60)
+# Beat anchor: "<word>", "<word>#2", "w12", "p2", "start", "end", optionally prefixed with a
+# scene cue namespace, e.g. "s03.derivative". Resolved against grid.json once narration exists.
+ANCHOR_RE = re.compile(r"^(?:s(?P<scene>\d+)\.)?(?P<name>[^\W_](?:[\w'\u2019-]*[^\W_])?)"
+                       r"(?:#(?P<nth>[1-9]\d*))?$")
 
 
 def fail(errs):
@@ -104,6 +108,7 @@ def check(sb) -> tuple:
         return errs, warns
 
     ids = set()
+    anchors = []  # (location, cue scene number, containing scene id)
     total = 0.0
     for i, sc in enumerate(scenes):
         loc = f"scene[{i}]"
@@ -141,16 +146,34 @@ def check(sb) -> tuple:
             if not isinstance(b, dict):
                 errs.append(f"{bloc}: must be an object")
                 continue
-            if "t" not in b or "action" not in b:
-                errs.append(f"{bloc}: needs t and action")
+            if "action" not in b or ("t" not in b and "on" not in b):
+                errs.append(f"{bloc}: needs t (or on) and action")
                 continue
-            t = _num(b["t"])
-            if t is None:
-                errs.append(f"{bloc}: t must be a number, got {b['t']!r}")
-                continue
-            if t < last_t:
-                errs.append(f"{bloc}: t not in ascending order")
-            last_t = t
+            if "on" in b:
+                m = ANCHOR_RE.match(b["on"]) if isinstance(b["on"], str) else None
+                if not m:
+                    errs.append(f"{bloc}: on must be a word or cue like 'derivative', "
+                                f"'derivative#2', 'p2' or 's03.end', got {b['on']!r}")
+                elif m.group("scene") is not None:
+                    anchors.append((bloc, m.group("scene"), sid))
+            if "t" in b:
+                t = _num(b["t"])
+                if t is None:
+                    errs.append(f"{bloc}: t must be a number, got {b['t']!r}")
+                    continue
+                if t < last_t:
+                    errs.append(f"{bloc}: t not in ascending order")
+                last_t = t
+
+    known = {str(i) for i in ids}
+    for bloc, num, home in anchors:
+        # "s03" and "s3" both name scene "03"; compare numerically against numeric ids.
+        match = {i for i in known if i.isdigit() and int(i) == int(num)}
+        if not match:
+            errs.append(f"{bloc}: on refers to scene s{num}, which does not exist")
+        elif str(home) not in match:
+            warns.append(f"{bloc}: on refers to another scene (s{num}); "
+                         "beats normally anchor to their own scene")
 
     target = _num(sb.get("target_duration_s", 0)) or 0.0
     if target > 0:
