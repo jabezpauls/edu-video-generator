@@ -8,12 +8,19 @@ Usage: validate_storyboard.py <project-dir>
 """
 import json
 import os
+import re
 import sys
 
 ALLOWED_POS = {"center", "top", "bottom", "left", "right",
                "top-left", "top-right", "bottom-left", "bottom-right"}
 ALLOWED_KIND = {"equation", "text", "shape", "image", "code", "chart", "axes"}
-ENGINES = ("manim", "remotion")
+ENGINES = ("manim", "remotion", "motion")
+MODES = ("lesson", "short")
+FORMATS = ("16x9", "1x1", "4x5", "9x16")
+DEFAULT_FORMATS = {"lesson": ["16x9"], "short": ["9x16"]}
+PRESET_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+SHORT_RANGE_S = (30, 60)
 
 
 def fail(errs):
@@ -30,6 +37,53 @@ def _num(value):
     return float(value)
 
 
+def effective(sb) -> dict:
+    """Resolve the v2 fields a storyboard leaves out (v1 storyboards omit all of them)."""
+    mode = sb.get("mode") if sb.get("mode") in MODES else "lesson"
+    formats = sb.get("formats")
+    if not isinstance(formats, list) or not formats:
+        formats = DEFAULT_FORMATS[mode]
+    return {"mode": mode, "formats": list(formats), "preset": sb.get("preset")}
+
+
+def _check_v2_fields(sb, errs, warns):
+    mode = sb.get("mode", "lesson")
+    if mode not in MODES:
+        errs.append(f"mode must be {'|'.join(MODES)}, got {mode!r}")
+
+    if "formats" in sb:
+        fmts = sb["formats"]
+        if not isinstance(fmts, list) or not fmts:
+            errs.append("formats must be a non-empty array")
+        else:
+            bad = [f for f in fmts if f not in FORMATS]
+            if bad:
+                errs.append(f"formats has unknown entries {bad!r}; allowed: {', '.join(FORMATS)}")
+            dupes = sorted({f for f in fmts if isinstance(f, str) and fmts.count(f) > 1})
+            if dupes:
+                errs.append(f"formats has duplicate entries {dupes!r}")
+
+    if "preset" in sb and sb["preset"] is not None:
+        p = sb["preset"]
+        if not isinstance(p, str) or not PRESET_RE.match(p):
+            errs.append(f"preset must be a lowercase slug (e.g. 'chalkboard'), got {p!r}")
+
+    pal = sb.get("palette")
+    if pal is not None:
+        if not isinstance(pal, dict):
+            errs.append("palette must be an object of colour name -> hex string")
+        else:
+            for name, val in pal.items():
+                if not isinstance(val, str) or not HEX_RE.match(val):
+                    errs.append(f"palette.{name} must be a hex colour, got {val!r}")
+
+    if mode == "short":
+        target = _num(sb.get("target_duration_s"))
+        lo, hi = SHORT_RANGE_S
+        if target is not None and not (lo <= target <= hi):
+            errs.append(f"short mode: target_duration_s must be {lo}-{hi}s, got {target:g}s")
+
+
 def check(sb) -> tuple:
     """Return (errors, warnings) for a parsed storyboard."""
     errs, warns = [], []
@@ -41,6 +95,8 @@ def check(sb) -> tuple:
             errs.append(f"missing top-level field: {k}")
     if sb.get("engine") not in (*ENGINES, None):
         errs.append(f"engine must be {'|'.join(ENGINES)}, got {sb.get('engine')!r}")
+
+    _check_v2_fields(sb, errs, warns)
 
     scenes = sb.get("scenes", [])
     if not isinstance(scenes, list) or not scenes:
@@ -128,8 +184,10 @@ def main() -> int:
     if errs:
         fail(errs)
     total = sum(float(s.get("est_duration_s", 0) or 0) for s in sb["scenes"])
+    eff = effective(sb)
     print(f"storyboard OK: {len(sb['scenes'])} scenes, ~{total:.0f}s, "
-          f"engine={sb.get('engine')}")
+          f"engine={sb.get('engine')}, mode={eff['mode']}, "
+          f"formats={','.join(eff['formats'])}")
     return 0
 
 
