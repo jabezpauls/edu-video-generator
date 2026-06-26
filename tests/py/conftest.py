@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-SCRIPTS = REPO / "skills" / "educational-video" / "scripts"
+SKILL = REPO / "skills" / "educational-video"
+SCRIPTS = SKILL / "scripts"
 
 
 def load_script(name: str):
