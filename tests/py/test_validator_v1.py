@@ -52,7 +52,7 @@ def test_beats_must_ascend(validator, v1_storyboard):
 
 def test_beat_needs_t_and_action(validator, v1_storyboard):
     v1_storyboard["scenes"][0]["beats"] = [{"action": "write"}]
-    assert any("needs t and action" in e for e in validator.manual_check(v1_storyboard))
+    assert any("needs t (or on) and action" in e for e in validator.manual_check(v1_storyboard))
 
 
 def test_duration_outside_tolerance(validator, v1_storyboard):
