@@ -21,7 +21,7 @@ MANIM_OK=false; REMOTION_OK=false
 for t in ffmpeg uv node npm; do
   if have "$t"; then log "found $t: $($t --version 2>&1 | head -n1)"; else warn "MISSING $t"; fi
 done
-have pdflatex && log "found pdflatex (LaTeX ok)" || warn "pdflatex missing — Manim LaTeX disabled"
+if have pdflatex; then log "found pdflatex (LaTeX ok)"; else warn "pdflatex missing — Manim LaTeX disabled"; fi
 
 # --- Python venv via uv, pinned to 3.12 ---
 if [[ "$ENGINE" == "manim" || "$ENGINE" == "auto" ]]; then
@@ -36,8 +36,11 @@ if [[ "$ENGINE" == "manim" || "$ENGINE" == "auto" ]]; then
     if [[ -x "$PROJECT/.venv/bin/python" ]]; then
       if ! "$PROJECT/.venv/bin/python" -c "import manim" 2>/dev/null; then
         log "installing manim into venv"
-        VIRTUAL_ENV="$PROJECT/.venv" uv pip install --python "$PROJECT/.venv/bin/python" "manim>=0.19" \
-          && log "manim installed" || warn "manim install failed"
+        if VIRTUAL_ENV="$PROJECT/.venv" uv pip install --python "$PROJECT/.venv/bin/python" "manim>=0.19"; then
+          log "manim installed"
+        else
+          warn "manim install failed"
+        fi
       else
         log "manim already importable"
       fi
@@ -91,14 +94,20 @@ IDX
 import React from "react";
 export const Root: React.FC = () => (<></>);
 ROOT
-      ( cd "$PROJECT/scenes" && npm install >/dev/null 2>&1 ) \
-        && log "Remotion deps installed" || warn "npm install failed in scenes/"
+      if ( cd "$PROJECT/scenes" && npm install >/dev/null 2>&1 ); then
+        log "Remotion deps installed"
+      else
+        warn "npm install failed in scenes/"
+      fi
     else
       log "Remotion project already scaffolded"
     fi
     # pre-warm headless chrome
-    ( cd "$PROJECT/scenes" && npx --yes remotion browser ensure >/dev/null 2>&1 ) \
-      && log "Chrome headless shell ready" || warn "could not pre-warm Chrome (will retry at render)"
+    if ( cd "$PROJECT/scenes" && npx --yes remotion browser ensure >/dev/null 2>&1 ); then
+      log "Chrome headless shell ready"
+    else
+      warn "could not pre-warm Chrome (will retry at render)"
+    fi
     [[ -f "$PROJECT/scenes/package.json" ]] && REMOTION_OK=true
   else
     warn "npm not found — cannot set up Remotion"
