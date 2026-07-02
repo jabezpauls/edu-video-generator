@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
 
 # Node / Remotion
 node_modules/
@@ -24,7 +26,8 @@ audio/
 *.png
 *.jpg
 *.jpeg
-!skills/**/references/**          # keep any example images committed under references
+# keep any example images committed under references
+!skills/**/references/**
 storyboard.json
 manifest.json
 
