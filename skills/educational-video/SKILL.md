@@ -64,8 +64,9 @@ manifest. The user may override. Heuristics: `references/engine-selection.md`.
 
 ### Phase 3 — Plan / storyboard (Planner)
 Create `storyboard.json` per `references/storyboard-schema.md`: decompose into scenes, each with
-`narration`, `elements`, animation `beats` (with timestamps), `est_duration_s`, `template`,
-`assets`. Validate with `scripts/validate_storyboard.py`; fix until it passes. Summed scene
+`narration`, `elements`, animation `beats` (timestamps via `t`, or anchored to a spoken word
+via `on`), `est_duration_s`, `template`, `assets`. Set `mode`, `formats` and `preset` only when
+the user asked for them; the defaults are a 16x9 lesson. Validate with `scripts/validate_storyboard.py`; fix until it passes. Summed scene
 durations must be within **±15%** of target.
 
 ### Phase 4 — Generate code (Coder)
@@ -112,7 +113,7 @@ any unresolved critic warnings.
 
 ## Resumability & state
 
-- `scripts/new_project.sh <slug>` creates the per-run scaffold (`manifest.json`,
+- `scripts/new_project.sh <base-dir> <slug>` creates the per-run scaffold (`manifest.json`,
   `storyboard.json` stub, `.videogen/`, `scenes/`, `assets/`, `audio/`, `output/`).
 - Treat `manifest.json` as the single source of run state; update `phase`, `engine`, retry
   counts, TTS provider, and warnings as you go.

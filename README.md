@@ -78,6 +78,8 @@ higher-quality voices; otherwise local Piper is used.
 educational-video-generator/
 ├── README.md                 # you are here
 ├── install.sh                # link/copy the skill into ~/.claude/skills
+├── tests/                    # node --test + pytest suites
+├── .github/workflows/        # CI
 ├── .gitignore
 └── skills/
     └── educational-video/
@@ -86,6 +88,18 @@ educational-video-generator/
         ├── references/       # knowledge corpus (engine selection, schemas, patterns, verify loop, TTS, troubleshooting)
         └── scripts/          # bootstrap, render, frame-extract, TTS, subtitle align, mux
 ```
+
+## Development
+
+```bash
+npm test                                   # node --test tests/node
+uv run --with pytest pytest tests/py       # or: python -m pytest tests/py
+shellcheck -x install.sh skills/educational-video/scripts/*.sh
+```
+
+CI (`.github/workflows/ci.yml`) runs the same three checks. The tests never render video; they
+cover the storyboard validator (old and current schema), project scaffolding, subtitle
+formatting, TTS detection and the shell script guards.
 
 ## How it works (the loops)
 
