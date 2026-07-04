@@ -11,7 +11,7 @@ OUT="$PROJECT/output"
 TMP="$PROJECT/.videogen/mux"; mkdir -p "$TMP"
 
 # Ordered scene ids from storyboard
-mapfile -t IDS < <(python3 -c "import json;print('\n'.join(s['id'] for s in json.load(open('$PROJECT/storyboard.json'))['scenes']))")
+mapfile -t IDS < <(python3 -c "import json,sys;print('\n'.join(s['id'] for s in json.load(open(sys.argv[1]))['scenes']))" "$PROJECT/storyboard.json")
 
 # 1. Per-scene: mux narration audio into each scene video (pad video if shorter than audio)
 LIST="$TMP/concat.txt"; : > "$LIST"

@@ -43,13 +43,19 @@ def whisper_words(wav):
 
 
 def fmt_srt(t):
-    h = int(t // 3600); m = int((t % 3600) // 60); s = int(t % 60); ms = int((t - int(t)) * 1000)
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+    total_ms = max(0, round(t * 1000))
+    h, rem = divmod(total_ms, 3_600_000)
+    m, rem = divmod(rem, 60_000)
+    sec, ms = divmod(rem, 1000)
+    return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
 
 
 def fmt_ass(t):
-    h = int(t // 3600); m = int((t % 3600) // 60); s = t % 60
-    return f"{h:d}:{m:02d}:{s:05.2f}"
+    total_cs = max(0, round(t * 100))
+    h, rem = divmod(total_cs, 360_000)
+    m, rem = divmod(rem, 6000)
+    sec, cs = divmod(rem, 100)
+    return f"{h:d}:{m:02d}:{sec:02d}.{cs:02d}"
 
 
 def group_lines(words, max_words=7):

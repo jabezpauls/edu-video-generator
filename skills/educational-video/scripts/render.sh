@@ -53,7 +53,8 @@ render_remotion() {
 
 scene_ids() {
   if [[ "$SCENE" == "all" ]]; then
-    python3 -c "import json,sys; d=json.load(open('$PROJECT/storyboard.json')); print('\n'.join(s['id'] for s in d['scenes']))"
+    python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('\n'.join(s['id'] for s in d['scenes']))" \
+      "$PROJECT/storyboard.json"
   else
     echo "$SCENE"
   fi
