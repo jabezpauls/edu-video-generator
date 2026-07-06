@@ -108,3 +108,74 @@ def find_videos(project, draft=False, explicit=None):
                 found[format_of(w, h)] = p
                 break
     return found
+
+
+# ---------------------------------------------------------------------------------------------
+# Single streaming pass over a video: per-frame motion energy, luma stats and edge density.
+# ---------------------------------------------------------------------------------------------
+ANALYSIS_FPS = 30
+ANALYSIS_W = 256
+EDGE_T = 48  # gradient magnitude (0-255 scale) that counts as an edge / piece of ink
+UNSAFE = {"top": 0.14, "bottom": 0.20, "right": 0.12}  # 9:16 platform UI zones, fraction of frame
+
+
+def even(n):
+    return max(2, int(n) // 2 * 2)
+
+
+def zone_masks(h, w):
+    """Boolean masks over an (h, w) frame for the 9:16 UI zones."""
+    top = np.zeros((h, w), bool)
+    top[: int(h * UNSAFE["top"])] = True
+    bottom = np.zeros((h, w), bool)
+    bottom[int(h * (1 - UNSAFE["bottom"])):] = True
+    right = np.zeros((h, w), bool)
+    right[int(h * UNSAFE["top"]): int(h * (1 - UNSAFE["bottom"])), int(w * (1 - UNSAFE["right"])):] = True
+    return {"top": top, "bottom": bottom, "right": right}
+
+
+def analyze(path, fps=None, zones=False):
+    """Stream `path` once at <= 30 fps and return per-frame arrays.
+
+    energy[i]  mean |frame i+1 - frame i| (0-255 scale), so len(energy) == frames - 1
+    mean[i], std[i]  luma mean / standard deviation
+    ink[i]     fraction of pixels that are edges: a cheap proxy for how much text/linework is up
+    zone_ink   {zone: per-frame edge fraction inside each 9:16 UI zone} when zones=True
+    """
+    w0, h0, nfps, dur, _ = probe(path)
+    afps = min(nfps, ANALYSIS_FPS) if fps is None else fps
+    w = ANALYSIS_W
+    h = even(w * h0 / w0)
+    proc = subprocess.Popen(
+        ["ffmpeg", "-v", "error", "-i", path, "-vf", f"fps={afps},scale={w}:{h}:flags=area",
+         "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+        stdout=subprocess.PIPE)
+    size = w * h
+    masks = zone_masks(h, w) if zones else {}
+    mean, std, ink, prev = [], [], [], None
+    energy = []
+    zi = {k: [] for k in masks}
+    while True:
+        buf = proc.stdout.read(size * 32)
+        if not buf:
+            break
+        n = len(buf) // size
+        if n == 0:
+            break
+        g = np.frombuffer(buf[: n * size], np.uint8).reshape(n, h, w).astype(np.int16)
+        full = g if prev is None else np.concatenate([prev[None], g])
+        energy.extend(np.abs(np.diff(full, axis=0)).mean(axis=(1, 2)).tolist())
+        prev = g[-1]
+        flat = g.reshape(n, -1)
+        mean.extend(flat.mean(1).tolist())
+        std.extend(flat.std(1).tolist())
+        edge = np.zeros(g.shape, bool)
+        edge[:, :, 1:] |= np.abs(np.diff(g, axis=2)) > EDGE_T
+        edge[:, 1:, :] |= np.abs(np.diff(g, axis=1)) > EDGE_T
+        ink.extend(edge.reshape(n, -1).mean(1).tolist())
+        for k, m in masks.items():
+            zi[k].extend(edge[:, m].mean(1).tolist())
+    proc.wait()
+    return {"fps": afps, "native_fps": nfps, "duration": dur, "size": (w0, h0),
+            "energy": np.array(energy), "mean": np.array(mean), "std": np.array(std),
+            "ink": np.array(ink), "zone_ink": {k: np.array(v) for k, v in zi.items()}}
