@@ -179,3 +179,66 @@ def analyze(path, fps=None, zones=False):
     return {"fps": afps, "native_fps": nfps, "duration": dur, "size": (w0, h0),
             "energy": np.array(energy), "mean": np.array(mean), "std": np.array(std),
             "ink": np.array(ink), "zone_ink": {k: np.array(v) for k, v in zi.items()}}
+
+
+# ---------------------------------------------------------------------------------------------
+# Metrics from the per-frame arrays. Pure functions so they can be tested on tiny clips.
+# ---------------------------------------------------------------------------------------------
+STILL_T = 0.25      # mean abs frame difference below this counts as "nothing moving"
+EVENT_MIN = 0.6     # a visual event needs at least this much frame-to-frame change
+BLANK_STD = 4.0     # luma standard deviation below this is a near-uniform (blank) frame
+
+
+def longest_static(energy, fps, thr=STILL_T):
+    run = best = end = 0
+    for i, e in enumerate(energy):
+        run = run + 1 if e < thr else 0
+        if run > best:
+            best, end = run, i
+    return {"seconds": round(best / fps, 2), "from_s": round((end - best + 1) / fps, 2) if best else 0.0}
+
+
+def visual_events(energy, fps, min_sep=0.25):
+    """Times (s) where something new starts moving: local energy peaks well above the floor."""
+    if len(energy) == 0:
+        return []
+    sm = np.convolve(energy, np.ones(3) / 3, "same")
+    thr = max(EVENT_MIN, 2.5 * float(np.median(sm)))
+    peaks = []
+    for i in range(len(sm)):
+        left = sm[i - 1] if i else -1
+        right = sm[i + 1] if i + 1 < len(sm) else -1
+        if sm[i] >= thr and sm[i] >= left and sm[i] > right:
+            if peaks and (i - peaks[-1]) / fps < min_sep:
+                if sm[i] > sm[peaks[-1]]:
+                    peaks[-1] = i
+                continue
+            peaks.append(i)
+    # report the onset (first frame of the burst), not the peak
+    out = []
+    for p in peaks:
+        j = p
+        while j > 0 and sm[j - 1] >= 0.5 * sm[p] and p - j < int(0.5 * fps):
+            j -= 1
+        out.append(round((j + 1) / fps, 3))
+    return out
+
+
+def max_gap(events, duration):
+    ts = np.r_[0.0, events, duration]
+    gaps = np.diff(ts)
+    i = int(np.argmax(gaps))
+    return {"seconds": round(float(gaps[i]), 2), "from_s": round(float(ts[i]), 2)}
+
+
+def blank_runs(std, mean, fps, thr=BLANK_STD):
+    runs = []
+    for i in np.where(std < thr)[0]:
+        if runs and i == runs[-1][1] + 1:
+            runs[-1][1] = int(i)
+        else:
+            runs.append([int(i), int(i)])
+    n = len(std)
+    return [{"from_s": round(a / fps, 3), "frames": b - a + 1, "seconds": round((b - a + 1) / fps, 3),
+             "mean_luma": int(mean[a]),
+             "where": "start" if a == 0 else "end" if b == n - 1 else "mid"} for a, b in runs]
