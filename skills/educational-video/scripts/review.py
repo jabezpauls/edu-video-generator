@@ -370,3 +370,56 @@ def fast_action_strips(path, out_dir, energy, fps, dur, w0, h0, n=2, length=12):
         tile([Image.fromarray(x) for x in fr], 6, [f"{start + i / fps:.2f}s" for i in range(len(fr))], p)
         paths.append(p)
     return paths, [round(p / fps, 2) for p in peaks]
+
+
+ZONE_INK = 0.012  # edge fraction inside a UI zone that means "something is drawn there"
+
+
+def safe_zone_metrics(zone_ink, fps):
+    """Per-zone: how long content sits inside the 9:16 platform UI zones, and when it starts."""
+    out = {}
+    for z, arr in zone_ink.items():
+        on = arr > ZONE_INK
+        run = best = end = 0
+        for i, c in enumerate(on):
+            run = run + 1 if c else 0
+            if run > best:
+                best, end = run, i
+        out[z] = {"seconds_with_content": round(float(on.sum()) / fps, 2),
+                  "longest_run_s": round(best / fps, 2),
+                  "longest_run_from_s": round((end - best + 1) / fps, 2) if best else None,
+                  "max_edge_fraction": round(float(arr.max()), 4) if len(arr) else 0.0}
+    return out
+
+
+def loudness(path):
+    """Integrated loudness (LUFS) and true peak (dBTP), or None when there is no audio."""
+    r = run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-vn", "-af", "ebur128=peak=true",
+             "-f", "null", "-"], text=True)
+    summ = r.stderr[r.stderr.rfind("Summary"):]
+    vals = {}
+    for line in summ.splitlines():
+        s = line.strip()
+        if s.startswith("I:"):
+            vals["lufs"] = float(s.split()[1])
+        elif s.startswith("Peak:"):
+            vals["true_peak_dbtp"] = float(s.split()[1])
+    return vals or None
+
+
+def dead_air(path, noise_db=-45, min_s=0.8):
+    """Silent stretches in the audio track: [{from_s, seconds}]; longest first."""
+    r = run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-vn", "-af",
+             f"silencedetect=noise={noise_db}dB:d={min_s}", "-f", "null", "-"], text=True)
+    runs, start = [], None
+    for line in r.stderr.splitlines():
+        if "silence_start:" in line:
+            start = float(line.split("silence_start:")[1].split()[0])
+        elif "silence_end:" in line and start is not None:
+            end = float(line.split("silence_end:")[1].split()[0])
+            runs.append({"from_s": round(max(start, 0.0), 2), "seconds": round(end - max(start, 0.0), 2)})
+            start = None
+    if start is not None:  # silence runs to the end of the file
+        total = probe(path)[3]
+        runs.append({"from_s": round(start, 2), "seconds": round(total - start, 2)})
+    return sorted(runs, key=lambda x: -x["seconds"])
