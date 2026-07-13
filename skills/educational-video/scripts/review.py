@@ -276,3 +276,97 @@ def density_metrics(ink, fps):
             "longest_crowded_s": round(best / fps, 2),
             "crowded_from_s": round((end - best + 1) / fps, 2) if best else None,
             "rule": f"edge fraction > {DENSE_INK} reads as a wall of text/linework"}
+
+
+# ---------------------------------------------------------------------------------------------
+# Sheets
+# ---------------------------------------------------------------------------------------------
+def grab(path, w, h, fps=None, start=None, count=None):
+    """RGB frames as an (n, h, w, 3) array: sampled at `fps` from `start`, at most `count`."""
+    cmd = ["ffmpeg", "-v", "error"]
+    if start:
+        cmd += ["-ss", f"{start:.3f}"]
+    cmd += ["-i", path, "-vf", (f"fps={fps}," if fps else "") + f"scale={w}:{h}:flags=area"]
+    if count:
+        cmd += ["-frames:v", str(count)]
+    cmd += ["-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+    raw = run(cmd).stdout
+    return np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3)
+
+
+def tile(ims, cols, labels, out, pad=6, lab=22, bg=(20, 20, 20), font=None):
+    font = font or load_font(15)
+    w, h = ims[0].size
+    rows = (len(ims) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * (w + pad) + pad, rows * (h + lab + pad) + pad), bg)
+    d = ImageDraw.Draw(sheet)
+    for i, (im, label) in enumerate(zip(ims, labels)):
+        x = pad + (i % cols) * (w + pad)
+        y = pad + (i // cols) * (h + lab + pad)
+        sheet.paste(im, (x, y + lab))
+        d.text((x + 2, y + 3), label, fill=(235, 235, 235), font=font)
+    sheet.save(out, quality=88)
+    return out
+
+
+def sheet_paths(out_dir, base, n_sheets):
+    return [os.path.join(out_dir, f"{base}.jpg" if i == 0 else f"{base}_{i + 1}.jpg")
+            for i in range(n_sheets)]
+
+
+def sampled_sheets(path, out_dir, base, tw, th, cols, per_sheet, base_fps, max_sheets, dur, zone_fn=None):
+    """Sample a render evenly and tile it into at most `max_sheets` sheets.
+
+    Short videos get `base_fps` frames per second; long ones are thinned so a whole lesson
+    still fits in a handful of images. Returns (paths, seconds_between_frames).
+    """
+    step = max(1.0 / base_fps, dur / (per_sheet * max_sheets))
+    frames = grab(path, tw, th, fps=1.0 / step)
+    chunks = [list(range(i, min(i + per_sheet, len(frames)))) for i in range(0, len(frames), per_sheet)]
+    paths = []
+    for p, idx in zip(sheet_paths(out_dir, base, len(chunks)), chunks):
+        ims = [Image.fromarray(frames[i]) for i in idx]
+        if zone_fn:
+            ims = [zone_fn(im) for im in ims]
+        tile(ims, cols, [f"{i * step:.1f}s" for i in idx], p)
+        paths.append(p)
+    return paths, step
+
+
+def shade_unsafe(im):
+    """Overlay the 9:16 platform UI zones (top 14 %, bottom 20 %, right 12 %) in translucent red."""
+    im = im.convert("RGBA")
+    w, h = im.size
+    o = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(o)
+    red = (255, 0, 80, 80)
+    d.rectangle([0, 0, w, int(h * UNSAFE["top"])], fill=red)
+    d.rectangle([0, int(h * (1 - UNSAFE["bottom"])), w, h], fill=red)
+    d.rectangle([int(w * (1 - UNSAFE["right"])), int(h * UNSAFE["top"]), w,
+                 int(h * (1 - UNSAFE["bottom"]))], fill=red)
+    return Image.alpha_composite(im, o).convert("RGB")
+
+
+def fast_action_strips(path, out_dir, energy, fps, dur, w0, h0, n=2, length=12):
+    """12 consecutive frames around each of the n fastest moments: pops, overlaps, bad arcs."""
+    if len(energy) < length:
+        return [], []
+    win = np.convolve(energy, np.ones(length), "valid")
+    peaks = []
+    for i in np.argsort(win)[::-1]:
+        if all(abs(int(i) - p) > int(1.0 * fps) for p in peaks):
+            peaks.append(int(i))
+        if len(peaks) == 5:
+            break
+    sw = 640 if w0 >= h0 else 360
+    sh = even(sw * h0 / w0)
+    paths = []
+    for k, c in enumerate(peaks[:n]):
+        start = max(0.0, min(c, len(energy) - length) / fps)
+        fr = grab(path, sw, sh, fps=fps, start=start, count=length)
+        if not len(fr):
+            continue
+        p = os.path.join(out_dir, "strip_fast.jpg" if k == 0 else f"strip_fast{k + 1}.jpg")
+        tile([Image.fromarray(x) for x in fr], 6, [f"{start + i / fps:.2f}s" for i in range(len(fr))], p)
+        paths.append(p)
+    return paths, [round(p / fps, 2) for p in peaks]
