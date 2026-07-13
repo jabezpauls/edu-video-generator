@@ -533,3 +533,85 @@ def sync_metrics(cues, energy, fps, duration, tolerance_ms=80):
     res["note"] = ("positive = picture late, negative = picture early; resolution is one analysis frame "
                    f"({1000 / fps:.0f} ms). Visuals should land on the word, +-{tolerance_ms} ms.")
     return res
+
+
+# ---------------------------------------------------------------------------------------------
+# Thresholds and flags. Looser than a promo reel: a lesson may hold while narration explains a
+# displayed result. Each flag names the critic criterion it bears on and the cap it implies.
+# ---------------------------------------------------------------------------------------------
+THRESHOLDS = {
+    "lesson": {"static_s": (6, 10), "gap_s": (6, 10), "first_content_s": (1.0, 2.5),
+               "dead_air_s": (2.5, 5.0), "crowded_s": (8, 15), "mid_blank_s": (0.3, 1.0)},
+    "short": {"static_s": (3, 5), "gap_s": (4, 6), "first_content_s": (0.5, 1.5),
+              "dead_air_s": (1.5, 3.0), "crowded_s": (4, 8), "mid_blank_s": (0.2, 0.5)},
+}
+LUFS_TARGET, LUFS_WARN, LUFS_FAIL, TP_MAX = -14.0, 1.5, 3.0, -1.0
+SYNC_WARN_MS, SYNC_FAIL_MS = 80, 150
+ZONE_WARN_S = 1.0
+
+
+def level(value, bounds):
+    warn, fail = bounds
+    return "fail" if value > fail else "warn" if value > warn else None
+
+
+def build_flags(M, mode):
+    T = THRESHOLDS[mode]
+    flags = []
+
+    def add(lv, criterion, metric, msg, cap=None):
+        if lv:
+            flags.append({"level": lv, "criterion": criterion, "metric": metric, "message": msg,
+                          **({"suggested_cap": cap} if cap else {})})
+
+    h = M["hook"]
+    if h["frame0_blank"]:
+        add("fail", "Hook", "hook.frame0_blank", "frame 0 is near-blank", 6)
+    if h["first_content_s"] is None:
+        add("fail", "Hook", "hook.first_content_s", "no content ever appears", 6)
+    else:
+        add(level(h["first_content_s"], T["first_content_s"]), "Hook", "hook.first_content_s",
+            f"first content only at {h['first_content_s']} s")
+    s = M["longest_static"]
+    add(level(s["seconds"], T["static_s"]), "Pacing", "longest_static",
+        f"nothing moves for {s['seconds']} s from {s['from_s']} s", 7)
+    g = M["max_gap_between_visual_events"]
+    add(level(g["seconds"], T["gap_s"]), "Pacing", "max_gap_between_visual_events",
+        f"{g['seconds']} s without a new visual event from {g['from_s']} s", 7)
+    for b in M["near_blank_frames"]:
+        if b["where"] == "mid":
+            add(level(b["seconds"], T["mid_blank_s"]), "Polish", "near_blank_frames",
+                f"blank frame(s) mid-film at {b['from_s']} s ({b['seconds']} s)", 7)
+    d = M["text_density"]
+    add(level(d.get("longest_crowded_s", 0), T["crowded_s"]), "Clarity", "text_density",
+        f"crowded screen for {d.get('longest_crowded_s')} s from {d.get('crowded_from_s')} s")
+    ld = M.get("loudness")
+    if ld and "lufs" in ld:
+        off = abs(ld["lufs"] - LUFS_TARGET)
+        add("fail" if off > LUFS_FAIL else "warn" if off > LUFS_WARN else None, "Polish",
+            "loudness.lufs", f"integrated {ld['lufs']} LUFS, target {LUFS_TARGET:g}", 6)
+        if ld.get("true_peak_dbtp", -99) > TP_MAX:
+            add("warn", "Polish", "loudness.true_peak_dbtp", f"true peak {ld['true_peak_dbtp']} dBTP > {TP_MAX:g}", 6)
+    runs = M.get("dead_air") or []
+    if runs:
+        add(level(runs[0]["seconds"], T["dead_air_s"]), "Pacing", "dead_air",
+            f"{runs[0]['seconds']} s of silence from {runs[0]['from_s']} s")
+    sy = M.get("sync")
+    if sy and "mean_abs_ms" in sy:
+        worst = max(abs(sy["median_ms"]), sy["mean_abs_ms"])
+        add("fail" if worst > SYNC_FAIL_MS else "warn" if worst > SYNC_WARN_MS else None,
+            "Narration sync", "sync", f"median {sy['median_ms']} ms, mean |offset| {sy['mean_abs_ms']} ms "
+            f"over {sy['cues_with_visual']} cues (positive = picture late)", 6)
+    for z, v in (M.get("safe_zone") or {}).items():
+        if v["longest_run_s"] > ZONE_WARN_S:
+            add("warn", "Readability", f"safe_zone.{z}", f"content in the 9:16 {z} UI zone for "
+                f"{v['longest_run_s']} s from {v['longest_run_from_s']} s", 7)
+    durs = {f: i["duration"] for f, i in M["formats"].items()}
+    if durs and max(durs.values()) - min(durs.values()) > 0.5:
+        add("warn", "Polish", "formats.duration", f"format durations differ: {durs}")
+    for f, i in M["formats"].items():
+        if f in FORMATS and abs(i["size"][0] / i["size"][1] - FORMATS[f][0] / FORMATS[f][1]) > 0.02:
+            add("warn", "Polish", f"formats.{f}", f"{f} render is {i['size'][0]}x{i['size'][1]}")
+        if not i["has_audio"]:
+            add("warn", "Polish", f"formats.{f}", f"{f} render has no audio track")
+    return flags
