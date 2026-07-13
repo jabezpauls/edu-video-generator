@@ -58,3 +58,38 @@ def test_no_blank_runs_on_busy_clip(review, clip):
     a = review.analyze(clip)
     runs = review.blank_runs(a["std"], a["mean"], a["fps"])
     assert [r["where"] for r in runs if r["where"] == "mid"] == []
+
+
+def test_hook_flags_blank_frame_zero(review, tmp_path):
+    p = tmp_path / "h.mp4"
+    make_video(p, dur=4, fps=10, boxes=[box(1.5, t1=4)])
+    a = review.analyze(str(p))
+    h = review.hook_metrics(a["ink"], a["std"], a["energy"], a["fps"])
+    assert h["frame0_blank"] is True
+    assert 1.4 <= h["first_content_s"] <= 1.9
+
+
+def test_hook_good_when_content_at_frame_zero(review, tmp_path):
+    p = tmp_path / "h2.mp4"
+    make_video(p, dur=4, fps=10, boxes=[dict(x=20, y=40, w=100, h=60, t0=0, dx=80, slide=1.0)])
+    a = review.analyze(str(p))
+    h = review.hook_metrics(a["ink"], a["std"], a["energy"], a["fps"])
+    assert h["frame0_blank"] is False
+    assert h["first_content_s"] == 0.0
+    assert h["motion_in_first_3s"] > 1
+
+
+def test_density_flags_crowded_frames(review):
+    ink = np.r_[np.full(20, 0.01), np.full(10, 0.09), np.full(20, 0.01)]
+    d = review.density_metrics(ink, 10)
+    assert d["crowded_seconds"] == pytest.approx(1.0)
+    assert d["crowded_from_s"] == pytest.approx(2.0)
+    assert d["max"] == pytest.approx(0.09)
+
+
+def test_density_real_stripes_register_as_ink(review, tmp_path):
+    p = tmp_path / "d.mp4"
+    stripes = [dict(x=10, y=8 + i * 12, w=300, h=3, t0=0) for i in range(14)]
+    make_video(p, dur=1, fps=10, boxes=stripes)
+    a = review.analyze(str(p))
+    assert a["ink"].mean() > 0.05

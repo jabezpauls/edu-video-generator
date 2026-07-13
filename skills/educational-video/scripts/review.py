@@ -242,3 +242,37 @@ def blank_runs(std, mean, fps, thr=BLANK_STD):
     return [{"from_s": round(a / fps, 3), "frames": b - a + 1, "seconds": round((b - a + 1) / fps, 3),
              "mean_luma": int(mean[a]),
              "where": "start" if a == 0 else "end" if b == n - 1 else "mid"} for a, b in runs]
+
+
+DENSE_INK = 0.06  # edge fraction above which a frame is crowded (a full page of text or code)
+
+
+def hook_metrics(ink, std, energy, fps, window=3.0):
+    """What a viewer gets in the first seconds: when content first appears and how much moves."""
+    n = len(std)
+    first = next((i for i in range(n) if std[i] >= BLANK_STD and ink[i] >= 0.002), None)
+    k = max(1, int(window * fps))
+    return {
+        "frame0_blank": bool(n and std[0] < BLANK_STD),
+        "first_content_s": None if first is None else round(first / fps, 2),
+        "motion_in_first_3s": round(float(energy[:k].sum()), 1) if len(energy) else 0.0,
+        "events_in_first_3s": len(visual_events(energy[:k], fps)),
+    }
+
+
+def density_metrics(ink, fps):
+    """Text/linework load per frame (edge fraction). Flags stretches that are crowded."""
+    if len(ink) == 0:
+        return {"mean": 0.0, "max": 0.0, "max_at_s": 0.0, "crowded_seconds": 0.0, "crowded_from_s": None}
+    crowded = ink > DENSE_INK
+    run = best = end = 0
+    for i, c in enumerate(crowded):
+        run = run + 1 if c else 0
+        if run > best:
+            best, end = run, i
+    return {"mean": round(float(ink.mean()), 4), "max": round(float(ink.max()), 4),
+            "max_at_s": round(int(ink.argmax()) / fps, 2),
+            "crowded_seconds": round(float(crowded.sum()) / fps, 2),
+            "longest_crowded_s": round(best / fps, 2),
+            "crowded_from_s": round((end - best + 1) / fps, 2) if best else None,
+            "rule": f"edge fraction > {DENSE_INK} reads as a wall of text/linework"}
