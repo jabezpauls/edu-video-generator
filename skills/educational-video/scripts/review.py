@@ -423,3 +423,113 @@ def dead_air(path, noise_db=-45, min_s=0.8):
         total = probe(path)[3]
         runs.append({"from_s": round(start, 2), "seconds": round(total - start, 2)})
     return sorted(runs, key=lambda x: -x["seconds"])
+
+
+# ---------------------------------------------------------------------------------------------
+# Cue sync: do things appear when they are said? Optional: needs a cue file, degrades without.
+# ---------------------------------------------------------------------------------------------
+TIME_KEYS = ("t", "time", "at", "start", "s")
+HIT_IGNORE = ("whoosh", "riser", "tick", "bed", "swell")  # sfx that build into, or sit under, a hit
+
+
+def _num(v):
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def normalize_cues(raw):
+    """Accept the cue shapes a project may carry and return [{name, t, type?, what?}].
+
+    {"s03.derivative": 12.3}  |  {"cues": {...}}  |  {"cues": [{"name"|"what", "t", "type"}]}  |  [..]
+    """
+    if isinstance(raw, dict) and "cues" in raw:
+        raw = raw["cues"]
+    out = []
+    if isinstance(raw, dict):
+        for name, v in raw.items():
+            t = _num(v)
+            if t is None and isinstance(v, dict):
+                t = next((_num(v[k]) for k in TIME_KEYS if k in v and _num(v[k]) is not None), None)
+            if t is not None:
+                out.append({"name": str(name), "t": t,
+                            **({"type": v["type"]} if isinstance(v, dict) and "type" in v else {})})
+    elif isinstance(raw, list):
+        for c in raw:
+            if isinstance(c, dict):
+                t = next((_num(c[k]) for k in TIME_KEYS if k in c and _num(c[k]) is not None), None)
+                if t is None:
+                    continue
+                e = {"name": str(c.get("name") or c.get("cue") or c.get("what") or f"t{t:g}"), "t": t}
+                if "type" in c:
+                    e["type"] = str(c["type"])
+                if "what" in c:
+                    e["what"] = str(c["what"])
+                out.append(e)
+            elif isinstance(c, (list, tuple)) and len(c) == 2 and _num(c[1]) is not None:
+                out.append({"name": str(c[0]), "t": float(c[1])})
+    return sorted(out, key=lambda c: c["t"])
+
+
+def load_cues(project, grid=None, cues=None):
+    """Cue list and where it came from, or ([], None) when the project has none.
+
+    cues.json is preferred (it is what the film was built from); grid.json is the fallback.
+    """
+    cands = [cues] if cues else [os.path.join(project, "cues.json"), os.path.join(project, "grid.json"),
+                                 os.path.join(project, "audio", "grid.json")]
+    if grid and not cues:
+        cands = [grid] + cands
+    for p in cands:
+        if p and os.path.isfile(p):
+            got = normalize_cues(read_json(p, None))
+            if got:
+                return got, os.path.relpath(p, project) if os.path.isabs(p) else p
+    return [], None
+
+
+def onset_near(energy, fps, t, window=0.5):
+    """Visual onset near time t: first frame reaching 50 % of the local motion peak, as seconds.
+
+    None when nothing moves enough in the window to count as a visual event.
+    """
+    lo = max(0, int(round((t - window) * fps)))
+    hi = min(len(energy), int(round((t + window) * fps)) + 1)
+    if hi - lo < 2:
+        return None
+    seg = energy[lo:hi]
+    peak = float(seg.max())
+    if peak < EVENT_MIN:
+        return None
+    # take the burst nearest to t: scan outwards for the first frame at >= 50 % of its peak
+    cand = np.where(seg >= 0.5 * peak)[0]
+    near = cand[np.argmin(np.abs((lo + cand + 1) / fps - t))]
+    j = near
+    while j > 0 and seg[j - 1] >= 0.5 * peak:
+        j -= 1
+    return (lo + j + 1) / fps
+
+
+def sync_metrics(cues, energy, fps, duration, tolerance_ms=80):
+    """Visual onset minus cue time for each cue that has a visual event close by.
+
+    Positive = picture late. Cues without any visual event nearby are counted, not scored, since
+    not every spoken word is meant to trigger something.
+    """
+    rows, none = [], 0
+    for c in cues:
+        if c["t"] >= duration - 0.05 or c.get("type") in HIT_IGNORE:
+            continue
+        v = onset_near(energy, fps, c["t"])
+        if v is None:
+            none += 1
+            continue
+        rows.append({"cue": c["name"], "t": round(c["t"], 3), "visual_minus_cue_ms": round((v - c["t"]) * 1000)})
+    d = np.array([r["visual_minus_cue_ms"] for r in rows], float)
+    res = {"cues_total": len(cues), "cues_with_visual": len(rows), "cues_without_visual": none,
+           "tolerance_ms": tolerance_ms, "cues": rows[:200]}
+    if len(d):
+        res.update({"within_tolerance": f"{int((np.abs(d) <= tolerance_ms).sum())}/{len(d)}",
+                    "median_ms": round(float(np.median(d))), "mean_abs_ms": round(float(np.abs(d).mean()), 1),
+                    "worst_ms": round(float(d[np.abs(d).argmax()]))})
+    res["note"] = ("positive = picture late, negative = picture early; resolution is one analysis frame "
+                   f"({1000 / fps:.0f} ms). Visuals should land on the word, +-{tolerance_ms} ms.")
+    return res
