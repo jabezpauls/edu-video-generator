@@ -115,6 +115,7 @@ def find_videos(project, draft=False, explicit=None):
 # ---------------------------------------------------------------------------------------------
 ANALYSIS_FPS = 30
 ANALYSIS_W = 256
+CHG_T = 8    # per-pixel luma change that counts as "this pixel moved"
 EDGE_T = 48  # gradient magnitude (0-255 scale) that counts as an edge / piece of ink
 UNSAFE = {"top": 0.14, "bottom": 0.20, "right": 0.12}  # 9:16 platform UI zones, fraction of frame
 
@@ -138,6 +139,7 @@ def analyze(path, fps=None, zones=False):
     """Stream `path` once at <= 30 fps and return per-frame arrays.
 
     energy[i]  mean |frame i+1 - frame i| (0-255 scale), so len(energy) == frames - 1
+    chg[i]     fraction of pixels that moved by more than CHG_T: sees thin, local motion
     mean[i], std[i]  luma mean / standard deviation
     ink[i]     fraction of pixels that are edges: a cheap proxy for how much text/linework is up
     zone_ink   {zone: per-frame edge fraction inside each 9:16 UI zone} when zones=True
@@ -153,7 +155,7 @@ def analyze(path, fps=None, zones=False):
     size = w * h
     masks = zone_masks(h, w) if zones else {}
     mean, std, ink, prev = [], [], [], None
-    energy = []
+    energy, chg = [], []
     zi = {k: [] for k in masks}
     while True:
         buf = proc.stdout.read(size * 32)
@@ -164,7 +166,9 @@ def analyze(path, fps=None, zones=False):
             break
         g = np.frombuffer(buf[: n * size], np.uint8).reshape(n, h, w).astype(np.int16)
         full = g if prev is None else np.concatenate([prev[None], g])
-        energy.extend(np.abs(np.diff(full, axis=0)).mean(axis=(1, 2)).tolist())
+        d = np.abs(np.diff(full, axis=0))
+        energy.extend(d.mean(axis=(1, 2)).tolist())
+        chg.extend((d > CHG_T).mean(axis=(1, 2)).tolist())
         prev = g[-1]
         flat = g.reshape(n, -1)
         mean.extend(flat.mean(1).tolist())
@@ -177,51 +181,58 @@ def analyze(path, fps=None, zones=False):
             zi[k].extend(edge[:, m].mean(1).tolist())
     proc.wait()
     return {"fps": afps, "native_fps": nfps, "duration": dur, "size": (w0, h0),
-            "energy": np.array(energy), "mean": np.array(mean), "std": np.array(std),
+            "energy": np.array(energy), "chg": np.array(chg), "mean": np.array(mean), "std": np.array(std),
             "ink": np.array(ink), "zone_ink": {k: np.array(v) for k, v in zi.items()}}
 
 
 # ---------------------------------------------------------------------------------------------
 # Metrics from the per-frame arrays. Pure functions so they can be tested on tiny clips.
 # ---------------------------------------------------------------------------------------------
-STILL_T = 0.25      # mean abs frame difference below this counts as "nothing moving"
-EVENT_MIN = 0.6     # a visual event needs at least this much frame-to-frame change
+STILL_SUM = 0.0004  # summed chg over half a second below this: nothing is moving at all
+EVENT_CHG = 0.0015  # a visual event moves at least this fraction of the pixels in one frame
 BLANK_STD = 4.0     # luma standard deviation below this is a near-uniform (blank) frame
 
 
-def longest_static(energy, fps, thr=STILL_T):
+def activity(chg, fps, window=0.5):
+    """Moved-pixel fraction summed over a centred half-second window: tolerant of slow drawing."""
+    k = max(1, int(round(window * fps)))
+    return np.convolve(chg, np.ones(k), "same")
+
+
+def longest_static(chg, fps):
+    """Longest stretch in which (almost) no pixel changes, in seconds."""
+    still = activity(chg, fps) < STILL_SUM
     run = best = end = 0
-    for i, e in enumerate(energy):
-        run = run + 1 if e < thr else 0
+    for i, s in enumerate(still):
+        run = run + 1 if s else 0
         if run > best:
             best, end = run, i
     return {"seconds": round(best / fps, 2), "from_s": round((end - best + 1) / fps, 2) if best else 0.0}
 
 
-def visual_events(energy, fps, min_sep=0.25):
-    """Times (s) where something new starts moving: local energy peaks well above the floor."""
-    if len(energy) == 0:
+def visual_events(chg, fps, min_sep=0.25):
+    """Times (s) where something new starts: a sharp burst of change, or motion resuming after a hold."""
+    if len(chg) == 0:
         return []
-    sm = np.convolve(energy, np.ones(3) / 3, "same")
-    thr = max(EVENT_MIN, 2.5 * float(np.median(sm)))
-    peaks = []
+    sm = np.convolve(chg, np.ones(3) / 3, "same")
+    thr = max(EVENT_CHG, 2.5 * float(np.median(sm)))
+    marks = []
     for i in range(len(sm)):
         left = sm[i - 1] if i else -1
         right = sm[i + 1] if i + 1 < len(sm) else -1
         if sm[i] >= thr and sm[i] >= left and sm[i] > right:
-            if peaks and (i - peaks[-1]) / fps < min_sep:
-                if sm[i] > sm[peaks[-1]]:
-                    peaks[-1] = i
-                continue
-            peaks.append(i)
-    # report the onset (first frame of the burst), not the peak
+            j = i  # report the onset of the burst, not its peak
+            while j > 0 and sm[j - 1] >= 0.5 * sm[i] and i - j < int(0.5 * fps):
+                j -= 1
+            marks.append(j)
+    act = activity(chg, fps) >= STILL_SUM
+    marks += [i for i in range(1, len(act)) if act[i] and not act[i - 1]]  # motion resumes after a hold
     out = []
-    for p in peaks:
-        j = p
-        while j > 0 and sm[j - 1] >= 0.5 * sm[p] and p - j < int(0.5 * fps):
-            j -= 1
-        out.append(round((j + 1) / fps, 3))
-    return out
+    for m in sorted(marks):
+        if out and (m - out[-1]) / fps < min_sep:
+            continue
+        out.append(m)
+    return [round((m + 1) / fps, 3) for m in out]
 
 
 def max_gap(events, duration):
@@ -247,7 +258,7 @@ def blank_runs(std, mean, fps, thr=BLANK_STD):
 DENSE_INK = 0.06  # edge fraction above which a frame is crowded (a full page of text or code)
 
 
-def hook_metrics(ink, std, energy, fps, window=3.0):
+def hook_metrics(ink, std, chg, fps, window=3.0):
     """What a viewer gets in the first seconds: when content first appears and how much moves."""
     n = len(std)
     first = next((i for i in range(n) if std[i] >= BLANK_STD and ink[i] >= 0.002), None)
@@ -255,8 +266,8 @@ def hook_metrics(ink, std, energy, fps, window=3.0):
     return {
         "frame0_blank": bool(n and std[0] < BLANK_STD),
         "first_content_s": None if first is None else round(first / fps, 2),
-        "motion_in_first_3s": round(float(energy[:k].sum()), 1) if len(energy) else 0.0,
-        "events_in_first_3s": len(visual_events(energy[:k], fps)),
+        "motion_in_first_3s": round(float(chg[:k].sum()) * 100, 2),  # frame-fractions summed, in %
+        "events_in_first_3s": len(visual_events(chg[:k], fps)),
     }
 
 
@@ -486,29 +497,26 @@ def load_cues(project, grid=None, cues=None):
     return [], None
 
 
-def onset_near(energy, fps, t, window=0.5):
-    """Visual onset near time t: first frame reaching 50 % of the local motion peak, as seconds.
-
-    None when nothing moves enough in the window to count as a visual event.
-    """
+def onset_near(chg, fps, t, window=0.5):
+    """Visual onset near time t: first frame of the nearest burst, i.e. the first frame reaching
+    50 % of that burst's peak. None when nothing moves enough nearby to count as an event."""
     lo = max(0, int(round((t - window) * fps)))
-    hi = min(len(energy), int(round((t + window) * fps)) + 1)
+    hi = min(len(chg), int(round((t + window) * fps)) + 1)
     if hi - lo < 2:
         return None
-    seg = energy[lo:hi]
+    seg = chg[lo:hi]
     peak = float(seg.max())
-    if peak < EVENT_MIN:
+    if peak < EVENT_CHG:
         return None
-    # take the burst nearest to t: scan outwards for the first frame at >= 50 % of its peak
     cand = np.where(seg >= 0.5 * peak)[0]
-    near = cand[np.argmin(np.abs((lo + cand + 1) / fps - t))]
+    near = int(cand[np.argmin(np.abs((lo + cand + 1) / fps - t))])
     j = near
     while j > 0 and seg[j - 1] >= 0.5 * peak:
         j -= 1
     return (lo + j + 1) / fps
 
 
-def sync_metrics(cues, energy, fps, duration, tolerance_ms=80):
+def sync_metrics(cues, chg, fps, duration, tolerance_ms=80):
     """Visual onset minus cue time for each cue that has a visual event close by.
 
     Positive = picture late. Cues without any visual event nearby are counted, not scored, since
@@ -518,7 +526,7 @@ def sync_metrics(cues, energy, fps, duration, tolerance_ms=80):
     for c in cues:
         if c["t"] >= duration - 0.05 or c.get("type") in HIT_IGNORE:
             continue
-        v = onset_near(energy, fps, c["t"])
+        v = onset_near(chg, fps, c["t"])
         if v is None:
             none += 1
             continue
@@ -691,12 +699,12 @@ def main(argv=None):
     M["contact_sheets"] = {"files": [os.path.basename(s) for s in sheets], "seconds_per_frame": round(step, 2)}
     strips, peaks = fast_action_strips(videos[P], out, an["energy"], fps, dur, W0, H0)
     M["motion_peaks_s"] = peaks
-    M["longest_static"] = longest_static(an["energy"], fps)
-    events = visual_events(an["energy"], fps)
+    M["longest_static"] = longest_static(an["chg"], fps)
+    events = visual_events(an["chg"], fps)
     M["visual_events"] = len(events)
     M["max_gap_between_visual_events"] = {**max_gap(events, dur), "rule": "lesson: something new every ~3-6 s"}
     M["near_blank_frames"] = blank_runs(an["std"], an["mean"], fps)
-    M["hook"] = hook_metrics(an["ink"], an["std"], an["energy"], fps)
+    M["hook"] = hook_metrics(an["ink"], an["std"], an["chg"], fps)
     M["text_density"] = density_metrics(an["ink"], fps)
 
     # phone sheets, every format; 9:16 also gets the safe-zone sheet and zone metrics
@@ -721,7 +729,7 @@ def main(argv=None):
     M["dead_air"] = dead_air(videos[P])[:5] if info[P]["has_audio"] else []
     cues, src = load_cues(project, a.grid, a.cues)
     if cues:
-        M["sync"] = {"source": src, **sync_metrics(cues, an["energy"], fps, dur)}
+        M["sync"] = {"source": src, **sync_metrics(cues, an["chg"], fps, dur)}
     else:
         M["sync"] = None
         M["sync_note"] = "no cues.json/grid.json found: narration sync must be judged by eye from the sheets"

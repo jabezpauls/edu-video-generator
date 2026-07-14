@@ -28,14 +28,14 @@ def clip(tmp_path_factory):
 
 def test_longest_static_run(review, clip):
     a = review.analyze(clip)
-    s = review.longest_static(a["energy"], a["fps"])
+    s = review.longest_static(a["chg"], a["fps"])
     assert 3.4 <= s["seconds"] <= 4.2          # 2.3 s -> 6.5 s nothing moves
     assert 2.0 <= s["from_s"] <= 2.8
 
 
 def test_events_and_gap(review, clip):
     a = review.analyze(clip)
-    ev = review.visual_events(a["energy"], a["fps"])
+    ev = review.visual_events(a["chg"], a["fps"])
     assert any(abs(t - 1.0) < 0.35 for t in ev)
     assert any(abs(t - 2.0) < 0.35 for t in ev)
     assert any(abs(t - 6.5) < 0.35 for t in ev)
@@ -64,7 +64,7 @@ def test_hook_flags_blank_frame_zero(review, tmp_path):
     p = tmp_path / "h.mp4"
     make_video(p, dur=4, fps=10, boxes=[box(1.5, t1=4)])
     a = review.analyze(str(p))
-    h = review.hook_metrics(a["ink"], a["std"], a["energy"], a["fps"])
+    h = review.hook_metrics(a["ink"], a["std"], a["chg"], a["fps"])
     assert h["frame0_blank"] is True
     assert 1.4 <= h["first_content_s"] <= 1.9
 
@@ -73,10 +73,10 @@ def test_hook_good_when_content_at_frame_zero(review, tmp_path):
     p = tmp_path / "h2.mp4"
     make_video(p, dur=4, fps=10, boxes=[dict(x=20, y=40, w=100, h=60, t0=0, dx=80, slide=1.0)])
     a = review.analyze(str(p))
-    h = review.hook_metrics(a["ink"], a["std"], a["energy"], a["fps"])
+    h = review.hook_metrics(a["ink"], a["std"], a["chg"], a["fps"])
     assert h["frame0_blank"] is False
     assert h["first_content_s"] == 0.0
-    assert h["motion_in_first_3s"] > 1
+    assert h["motion_in_first_3s"] > 0.5
 
 
 def test_density_flags_crowded_frames(review):
@@ -93,3 +93,12 @@ def test_density_real_stripes_register_as_ink(review, tmp_path):
     make_video(p, dur=1, fps=10, boxes=stripes)
     a = review.analyze(str(p))
     assert a["ink"].mean() > 0.05
+
+
+def test_slow_thin_drawing_is_not_a_static_hold(review, tmp_path):
+    # a 2 px line growing slowly for 5 s moves few pixels per frame, but the picture is alive
+    p = tmp_path / "slow.mp4"
+    make_video(p, dur=6, fps=15, boxes=[dict(x=10, y=90, w=300, h=2, t0=0.5, dx=0, slide=0.1),
+                                         dict(x=10, y=40, w=4, h=40, t0=0.5, dx=290, slide=5.0)])
+    a = review.analyze(str(p))
+    assert review.longest_static(a["chg"], a["fps"])["seconds"] < 1.5

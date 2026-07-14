@@ -42,7 +42,7 @@ def test_sync_offsets_measured_in_ms(review, tmp_path):
                                          dict(x=10, y=110, w=60, h=40, t0=3.0, dx=150, slide=0.4)])
     a = review.analyze(str(p))
     cues = [{"name": "late", "t": 0.9}, {"name": "ontime", "t": 3.0}, {"name": "nothing", "t": 4.6}]
-    m = review.sync_metrics(cues, a["energy"], a["fps"], a["duration"])
+    m = review.sync_metrics(cues, a["chg"], a["fps"], a["duration"])
     by = {r["cue"]: r["visual_minus_cue_ms"] for r in m["cues"]}
     assert 50 <= by["late"] <= 200
     assert abs(by["ontime"]) <= 100
@@ -53,6 +53,6 @@ def test_sync_offsets_measured_in_ms(review, tmp_path):
 def test_sync_skips_ignored_types_and_end_of_film(review):
     import numpy as np
     en = np.zeros(100)
-    en[40:45] = 5
+    en[40:45] = 0.05
     out = review.sync_metrics([{"name": "w", "t": 2.0, "type": "whoosh"}, {"name": "z", "t": 9.99}], en, 10, 10.0)
     assert out["cues_with_visual"] == 0 and "median_ms" not in out
