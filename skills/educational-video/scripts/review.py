@@ -615,3 +615,134 @@ def build_flags(M, mode):
         if not i["has_audio"]:
             add("warn", "Polish", f"formats.{f}", f"{f} render has no audio track")
     return flags
+
+
+# ---------------------------------------------------------------------------------------------
+# Driver
+# ---------------------------------------------------------------------------------------------
+def pick_primary(videos, declared):
+    for f in declared + ["16x9"]:
+        if f in videos:
+            return f
+    return next(iter(videos))
+
+
+def ensure_review_log(project):
+    """Seed docs/review_log.md from the skill's template the first time a round runs."""
+    dest = os.path.join(project, "docs", "review_log.md")
+    tpl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates", "review_log.md")
+    if os.path.exists(dest) or not os.path.isfile(tpl):
+        return None
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(tpl) as src, open(dest, "w") as out:
+        out.write(src.read())
+    return dest
+
+
+def parse_args(argv):
+    import argparse
+    ap = argparse.ArgumentParser(description="Build the lesson critique kit from rendered mp4s.")
+    ap.add_argument("round", nargs="?", default="1")
+    ap.add_argument("--project", default=".", help="project root (default: cwd)")
+    ap.add_argument("--draft", action="store_true", help="read draft_<fmt>.mp4 renders")
+    ap.add_argument("--video", action="append", default=[], metavar="FMT=PATH",
+                    help="use this mp4 for a format instead of discovering one (repeatable)")
+    ap.add_argument("--mode", choices=sorted(THRESHOLDS), help="threshold set (default: storyboard mode)")
+    ap.add_argument("--grid", help="grid.json with named cues (default: auto)")
+    ap.add_argument("--cues", help="cues.json mapping cues to seconds (default: auto)")
+    return ap.parse_args(argv)
+
+
+def main(argv=None):
+    a = parse_args(sys.argv[1:] if argv is None else argv)
+    project = os.path.abspath(a.project)
+    explicit = {}
+    for spec in a.video:
+        fmt, _, p = spec.partition("=")
+        if not p or not os.path.isfile(p):
+            raise SystemExit(f"--video wants FMT=PATH to an existing file, got {spec!r}")
+        explicit[fmt if fmt in FORMATS else format_of(*probe(p)[:2])] = p
+    videos = find_videos(project, a.draft, explicit)
+    if not videos:
+        raise SystemExit("no renders found (looked in renders/ and output/). Render first, or pass --video FMT=PATH")
+    declared = declared_formats(project)
+    mode = a.mode or (read_json(os.path.join(project, "storyboard.json"), {}) or {}).get("mode") or "lesson"
+    mode = mode if mode in THRESHOLDS else "lesson"
+    out = os.path.join(project, "review", f"r{a.round}")
+    os.makedirs(out, exist_ok=True)
+
+    info = {}
+    for f, p in videos.items():
+        w, h, fps, dur, aud = probe(p)
+        info[f] = {"path": os.path.relpath(p, project), "size": [w, h], "fps": round(fps, 3),
+                   "duration": round(dur, 3), "has_audio": aud}
+    P = pick_primary(videos, declared)
+    W0, H0 = info[P]["size"]
+    an = analyze(videos[P])
+    fps, dur = an["fps"], info[P]["duration"]
+    wide = W0 >= H0
+
+    M = {"round": a.round, "mode": mode, "primary_format": P, "source": info[P]["path"],
+         "analysis_fps": round(fps, 3), "duration": dur, "formats": info}
+    # contact sheet(s) of the primary format, thinned for long lessons
+    tw = 440 if wide else 240
+    sheets, step = sampled_sheets(videos[P], out, "contact", tw, even(tw * H0 / W0), 4 if wide else 8,
+                                  20 if wide else 24, 2, 4, dur)
+    M["contact_sheets"] = {"files": [os.path.basename(s) for s in sheets], "seconds_per_frame": round(step, 2)}
+    strips, peaks = fast_action_strips(videos[P], out, an["energy"], fps, dur, W0, H0)
+    M["motion_peaks_s"] = peaks
+    M["longest_static"] = longest_static(an["energy"], fps)
+    events = visual_events(an["energy"], fps)
+    M["visual_events"] = len(events)
+    M["max_gap_between_visual_events"] = {**max_gap(events, dur), "rule": "lesson: something new every ~3-6 s"}
+    M["near_blank_frames"] = blank_runs(an["std"], an["mean"], fps)
+    M["hook"] = hook_metrics(an["ink"], an["std"], an["energy"], fps)
+    M["text_density"] = density_metrics(an["ink"], fps)
+
+    # phone sheets, every format; 9:16 also gets the safe-zone sheet and zone metrics
+    M["phone_sheets"] = {}
+    for f, p in videos.items():
+        w, h = info[f]["size"]
+        ph = even(360 * h / w)
+        tall = h / w > 1.5
+        cols, per = (5, 15) if tall else (4, 12 if h > w else 16)
+        files, st = sampled_sheets(p, out, f"phone_{f}", 360, ph, cols, per, 1, 4, info[f]["duration"])
+        M["phone_sheets"][f] = {"files": [os.path.basename(x) for x in files], "seconds_per_frame": round(st, 2)}
+        if f == "9x16":
+            files, _ = sampled_sheets(p, out, "safe_9x16", 360, ph, cols, per, 1, 4, info[f]["duration"],
+                                      zone_fn=shade_unsafe)
+            M["safe_sheets"] = [os.path.basename(x) for x in files]
+            z = analyze(p, zones=True)
+            M["safe_zone"] = safe_zone_metrics(z["zone_ink"], z["fps"])
+
+    M["loudness"] = loudness(videos[P]) or "no audio"
+    if not isinstance(M["loudness"], dict):
+        M["loudness"] = None
+    M["dead_air"] = dead_air(videos[P])[:5] if info[P]["has_audio"] else []
+    cues, src = load_cues(project, a.grid, a.cues)
+    if cues:
+        M["sync"] = {"source": src, **sync_metrics(cues, an["energy"], fps, dur)}
+    else:
+        M["sync"] = None
+        M["sync_note"] = "no cues.json/grid.json found: narration sync must be judged by eye from the sheets"
+    M["thresholds"] = {"mode": mode, **{k: list(v) for k, v in THRESHOLDS[mode].items()}}
+    M["flags"] = build_flags(M, mode)
+
+    with open(os.path.join(out, "metrics.json"), "w") as fh:
+        json.dump(M, fh, indent=1)
+    log = ensure_review_log(project)
+    brief = {k: M[k] for k in ("mode", "primary_format", "duration", "longest_static",
+                               "max_gap_between_visual_events", "hook", "loudness")}
+    print(json.dumps(brief, indent=1))
+    if M["sync"] and "within_tolerance" in M["sync"]:
+        print("sync:", M["sync"]["within_tolerance"], f"within {SYNC_WARN_MS} ms, median", M["sync"]["median_ms"], "ms")
+    for fl in M["flags"]:
+        print(f"[{fl['level']}] {fl['criterion']}: {fl['message']}")
+    print(f"wrote {os.path.relpath(out)}/: " + " ".join(sorted(os.listdir(out))))
+    if log:
+        print("created", os.path.relpath(log, project))
+    return M
+
+
+if __name__ == "__main__":
+    main()
