@@ -1,6 +1,7 @@
-# Verify loop: RITL + vision critic
+# Verify loop: RITL, per-scene vision check, scored lesson critic
 
-The core of the skill (Code2Video Critic + Renderer-in-the-Loop). Run per scene, in this order.
+Three layers, cheapest first. Sections 1-5 run per scene while building (Code2Video Critic +
+Renderer-in-the-Loop). Section 6 runs on the finished, muxed renders and decides when to ship.
 
 ## 1. RITL — deterministic error loop
 
@@ -67,6 +68,42 @@ If `verdict == FIX`: switch to Coder hat, apply the `fix_hint`s as targeted edit
 - Per-scene frame budget: **≤6**.
 - If a fix would require changing the storyboard (not just code), note it and ask the user
   rather than silently diverging from the approved plan.
+
+## 6. Scored lesson critic (final renders, any engine)
+
+Run after the lesson is muxed (`output/final*.mp4`, or `renders/<fmt>.mp4` for the motion
+engine). It judges only the rendered MP4s, so it is the same for Manim, Remotion and motion.
+
+Modes (record in `manifest.json` as `critic_mode`):
+
+| Mode | Rounds | Ships when |
+|---|---|---|
+| strict (default) | at least 3 | every score >= 8, and round >= 3 |
+| `--quick` | 1 | every score >= 7 |
+
+Each round:
+1. `python3 scripts/review.py <N> --project <project>` builds `review/r<N>/`: contact sheets,
+   fast-action strips, phone sheets at 360 px per format, `safe_9x16.jpg`, `metrics.json`.
+   Renders are discovered in `renders/` and `output/`; pass `--video <fmt>=<file>` otherwise.
+   `cues.json` / `grid.json`, when present, add cue-to-picture sync; without them that metric is
+   skipped and the critic judges sync by eye. Use `--mode short` for shorts (tighter thresholds).
+2. Spawn a FRESH critic subagent (one that did not write the lesson, and a new one each
+   round) with `references/critique.md`, the project path and the round number. It looks at every
+   image, reads `metrics.json`, scores the 8 criteria and appends the round to
+   `docs/review_log.md` in the exact format given there.
+3. Update the manifest: `critic_rounds` += 1, `scores` = the latest round's scores, `critic_mode`.
+4. Verdict SHIP per the table above, else fix the critic's 3 worst problems (smallest edits;
+   re-run RITL for any scene touched), re-render, and go to the next round.
+5. A critic that cannot be spawned: do the round yourself using the same file, keep its voice and
+   do not defend the code.
+
+Rules that keep the loop honest:
+- Scores come from the critic, never from the Coder. Do not argue a score up; fix the picture.
+- A problem still visible from the previous round cannot score higher than last round.
+- A fix that needs a storyboard change goes to the user first.
+- Cap strict mode at 6 rounds. If every score is still not >= 8, deliver the best round, list
+  what is outstanding in `warnings[]`, and say so in the delivery message.
+- Rounds count against the 40 re-render budget.
 
 ## Why this works
 
