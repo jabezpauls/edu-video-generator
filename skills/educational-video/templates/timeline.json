@@ -1,0 +1,13 @@
+{
+  "title": "Binary search",
+  "duration": 21,
+  "fps": 60,
+  "formats": ["16x9", "9x16"],
+  "marks": {
+    "hook": 0, "hook_w2": 0.45, "hook_w3": 0.9, "sub": 1.8,
+    "array": 5, "goal": 5.6, "ptrs": 6.8,
+    "look1": 7.8, "look2": 9.8, "look3": 11.8, "look4": 13.8,
+    "recap": 16.5, "recap_b": 18,
+    "done": 21
+  }
+}
