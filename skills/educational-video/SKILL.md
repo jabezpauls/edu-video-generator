@@ -91,6 +91,12 @@ Apply `references/verify-loop.md`:
    image, evaluate the rubric (overlap / off-screen safe-area / legibility incl. LaTeX rendered
    / composition / beat-timing). On FIX, give the Coder targeted instructions, re-render,
    re-critique (≤3). PASS = exit 0 AND critic PASS.
+3. **Scored critic (after Phase 9, on the final MP4s)**: `scripts/review.py <round>` builds the
+   critique kit, then a FRESH critic subagent scores 8 criteria using `references/critique.md`
+   and appends to `docs/review_log.md`. Strict default: at least 3 rounds, ship when every score
+   is ≥ 8. `--quick` (user asked for fast/draft): 1 round, ship at every score ≥ 7. After each
+   round set `critic_rounds`, `scores` (latest round) and `critic_mode` in the manifest, fix the
+   3 worst problems, re-render and repeat. Details: `references/verify-loop.md` §6.
 
 ### Phase 7 — Narration / TTS
 If narration is on, run `scripts/tts.py <project>` to synthesize per-scene audio from each
@@ -109,7 +115,8 @@ its narration, extend that scene's duration in code and re-render (≤2 reconcil
 
 ### Phase 10 — Deliver
 Report the path to `output/final.mp4`, total duration, engine used, per-scene retry counts, and
-any unresolved critic warnings.
+the final scores table (`manifest.json` `scores`, rounds in `docs/review_log.md`), and any
+unresolved critic warnings.
 
 ## Resumability & state
 
@@ -133,6 +140,7 @@ any unresolved critic warnings.
 - `references/manim-patterns.md` — Manim API snippets + error→fix table (RITL-DOC corpus).
 - `references/remotion-patterns.md` — Remotion API snippets + error→fix table (RITL-DOC corpus).
 - `references/component-library.md` — reusable templates for both engines.
-- `references/verify-loop.md` — RITL + vision-critic rubric, frame sampling, retry caps.
+- `references/verify-loop.md` — RITL + vision-critic rubric, frame sampling, retry caps, scored critic rounds.
+- `references/critique.md` — prompt for the fresh critic: 8 criteria, caps, failure modes, log format.
 - `references/tts-setup.md` — provider detection, recipes, alignment fallback.
 - `references/troubleshooting.md` — Python 3.14/Manim, LaTeX, cairo/pango, ffmpeg, Chrome shell.

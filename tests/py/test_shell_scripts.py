@@ -57,3 +57,23 @@ def test_shell_scripts_parse(script):
     r = subprocess.run(["bash", "-n", str(SCRIPTS / script)], capture_output=True, text=True,
                        check=False)
     assert r.returncode == 0, r.stderr
+
+
+def test_extract_frames_video_mode_needs_a_file(tmp_path):
+    r = subprocess.run(
+        ["bash", str(SCRIPTS / "extract_frames.sh"), "video", str(tmp_path), "r1", "1"],
+        capture_output=True, text=True, check=False,
+    )
+    assert r.returncode == 1 and "no video" in r.stderr
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_extract_frames_video_mode_grabs_a_still(tmp_path):
+    from synth import make_video
+    vid = make_video(tmp_path / "v.mp4", dur=2)
+    r = subprocess.run(
+        ["bash", str(SCRIPTS / "extract_frames.sh"), "video", str(tmp_path), "r1", "0.5", str(vid)],
+        capture_output=True, text=True, check=False,
+    )
+    assert r.returncode == 0
+    assert (tmp_path / ".videogen" / "frames" / "r1_0.5.png").is_file()
