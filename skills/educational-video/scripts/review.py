@@ -4,6 +4,9 @@
     python3 review.py <round> [--project DIR] [--draft] [--video fmt=path ...]
                       [--mode lesson|short] [--grid FILE] [--cues FILE]
 
+Needs numpy and Pillow: use the project venv (`.venv/bin/python review.py ...`, Manim brings both)
+or `uv run --with numpy --with pillow python review.py ...`.
+
 Writes <project>/review/r<round>/ with contact sheets, fast-action strips, phone sheets
 (360 px wide, every format), a 9:16 safe-zone sheet and metrics.json. Nothing is judged from
 source code or a live preview, so Manim, Remotion and motion-engine projects all work.

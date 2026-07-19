@@ -51,7 +51,8 @@ scripts/                 # deterministic helpers
   new_project.sh          # per-run scaffold + manifest/storyboard stubs
   validate_storyboard.py  # storyboard validation
   render.sh               # unified render (manim|remotion)
-  extract_frames.sh       # critic frames (ffmpeg / remotion still)
+  extract_frames.sh       # critic frames (ffmpeg / remotion still / any mp4)
+  review.py               # scored-critic kit from rendered mp4s (sheets + metrics.json)
   tts.py                  # per-scene narration synthesis
   align_subtitles.py      # .srt/.ass from word timings or forced alignment
   mux.sh                  # concat + audio + loudnorm + subtitles → final.mp4

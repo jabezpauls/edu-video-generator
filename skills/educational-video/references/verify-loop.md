@@ -82,7 +82,8 @@ Modes (record in `manifest.json` as `critic_mode`):
 | `--quick` | 1 | every score >= 7 |
 
 Each round:
-1. `python3 scripts/review.py <N> --project <project>` builds `review/r<N>/`: contact sheets,
+1. `<project>/.venv/bin/python scripts/review.py <N> --project <project>` (or
+   `uv run --with numpy --with pillow python scripts/review.py ...` when there is no venv) builds `review/r<N>/`: contact sheets,
    fast-action strips, phone sheets at 360 px per format, `safe_9x16.jpg`, `metrics.json`.
    Renders are discovered in `renders/` and `output/`; pass `--video <fmt>=<file>` otherwise.
    `cues.json` / `grid.json`, when present, add cue-to-picture sync; without them that metric is
