@@ -52,6 +52,12 @@ if [[ "$ENGINE" == "manim" || "$ENGINE" == "auto" ]]; then
   fi
 fi
 
+# --- Shared helpers: springs + per-format layout ---
+SCAFFOLD="$(dirname "$0")/scaffold_engine.sh"
+if [[ ( "$ENGINE" == "manim" || "$ENGINE" == "auto" ) && -x "$SCAFFOLD" ]]; then
+  "$SCAFFOLD" "$PROJECT" manim >/dev/null && log "manim helpers in scenes/ (springs.py, formats.py)"
+fi
+
 # --- Remotion scaffold ---
 if [[ "$ENGINE" == "remotion" || "$ENGINE" == "auto" ]]; then
   if have npm; then
@@ -90,7 +96,8 @@ import { Root } from "./Root";
 registerRoot(Root);
 IDX
       cat > "$PROJECT/scenes/src/Root.tsx" <<'ROOT'
-// Scenes are appended here by the Coder. Each scene = one <Composition>.
+// Scenes are appended here by the Coder. Each scene = <SceneFormats> (one composition per format):
+//   <SceneFormats id="Scene01" component={Scene01} seconds={12} />
 import React from "react";
 export const Root: React.FC = () => (<></>);
 ROOT
@@ -102,6 +109,7 @@ ROOT
     else
       log "Remotion project already scaffolded"
     fi
+    [[ -x "$SCAFFOLD" ]] && "$SCAFFOLD" "$PROJECT" remotion >/dev/null && log "remotion helpers in scenes/src/"
     # pre-warm headless chrome
     if ( cd "$PROJECT/scenes" && npx --yes remotion browser ensure >/dev/null 2>&1 ); then
       log "Chrome headless shell ready"
