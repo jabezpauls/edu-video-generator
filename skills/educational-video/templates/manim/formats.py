@@ -203,3 +203,26 @@ def row_or_column(*mobs, buff: float = 0.5, f: Optional[Format] = None):
     g = VGroup(*mobs).arrange(RIGHT if f.is_wide else DOWN, buff=buff)
     fit(g, f=f)
     return place(g, "center", f=f)
+
+
+# ----------------------------------------------------------------------------- command line
+def config_text(format_id: str, quality: str = "high") -> str:
+    """A manim config file body that sets the frame for one format (used by render.sh)."""
+    f = get(format_id)
+    w, h = f.pixels(quality)
+    fps = {"low": 15, "med": 30}.get(quality, 60)
+    return (
+        "[CLI]\n"
+        f"pixel_width = {w}\npixel_height = {h}\n"
+        f"frame_width = {f.frame_width:.6f}\nframe_height = {f.frame_height:.6f}\n"
+        f"frame_rate = {fps}\n"
+    )
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) >= 3 and sys.argv[1] == "--config":
+        sys.stdout.write(config_text(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "high"))
+    else:
+        sys.exit("usage: formats.py --config <16x9|1x1|4x5|9x16> [low|med|high]")
