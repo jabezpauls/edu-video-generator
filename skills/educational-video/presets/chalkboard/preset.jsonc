@@ -1,0 +1,39 @@
+// Chalkboard: dark slate with chalk-white ink and a handwritten display face. Friendly, for
+// concept explainers and anything that should feel like a teacher at a board.
+{
+  "name": "Chalkboard",
+  "description": "Dark green-grey board, chalk ink, hand-lettered titles.",
+  "colors": {
+    "bg": "#1f2a24",
+    "ink": "#f4f1e8",
+    "ink2": "#b7c1b4",
+    "accent": "#ffd166",
+    "highlight": "#ff8fa3",
+    "card": "#2a372f"
+  },
+  "fonts": {
+    "display": {
+      "file": "fonts/caveat-bold.woff2",
+      "ttf": "fonts/caveat-bold.ttf",
+      "family": "Caveat Bold",
+      "weight": 700,
+      "tracking": "0.01em"
+    },
+    "body": {
+      "file": "fonts/nunito-medium.woff2",
+      "ttf": "fonts/nunito-medium.ttf",
+      "family": "Nunito Medium",
+      "weight": 500
+    }
+  },
+  "voice": { "elevenlabs": "", "openai": "alloy", "piper": "en_US-amy-medium", "style": "warm, conversational, like talking a friend through it" },
+  "music": { "mood": "calm", "level_db": 0 },
+  "sfx": { "enabled": true, "level_db": -2 },
+  "captions": { "style": "outline", "position": "bottom", "active_word": "accent" },
+  "cards": { "intro": { "text": "", "subtitle": "" }, "outro": { "text": "That's the idea.", "subtitle": "" } },
+  "safe_area": {},
+  "notes": [
+    "Titles are short and lower-case friendly; the display face is for words, not for numbers or equations.",
+    "Draw things in (Write, Create) rather than fading them in: it should look chalked on."
+  ]
+}
