@@ -241,10 +241,10 @@ for (const fmt of FORMATS) {
         for (let q = 0; q < acc.length; q++) buf[q] = Math.min(255, Math.round(acc[q] / SUB));
         await write(p.stdin, buf);
       }
-      if (i % 60 === 0) process.stdout.write(`\r${fmt} frame ${i}/${N}  ${((Date.now() - t0) / 1000).toFixed(0)}s   `);
+      if (i % 60 === 0) process.stdout.write(`${process.stdout.isTTY ? '\r' : ''}${fmt} frame ${i}/${N}  ${((Date.now() - t0) / 1000).toFixed(0)}s${process.stdout.isTTY ? '   ' : '\n'}`);
     }
     p.stdin.end(); await done;
-    console.log(`\nwrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    console.log(`${process.stdout.isTTY ? '\n' : ''}wrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }
   await F.page.close();
 }
