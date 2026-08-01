@@ -51,8 +51,9 @@
   },
 
   // Sound bed. mood: "calm" | "curious" | "upbeat" | "none". level_db is relative to the bed's
-  // default level (0 = default, -3 = quieter). sfx level_db likewise.
+  // default level (0 = default, -3 = quieter).
   "music": { "mood": "", "level_db": 0 },
+  // Cue sounds (pop, tick, whoosh, chime). enabled: false mutes them; level_db as for music.
   "sfx": { "enabled": true, "level_db": 0 },
 
   // Burned-in captions (always on for 9:16 shorts). style: "pill" (text on a rounded card),
