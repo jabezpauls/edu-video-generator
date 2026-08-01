@@ -1,0 +1,38 @@
+// Paper: warm off-white with ink-dark text and a serif display face. Calm and bookish, for
+// derivations, history and anything read rather than watched.
+{
+  "name": "Paper",
+  "description": "Warm off-white page, dark ink, serif titles, terracotta accent.",
+  "colors": {
+    "bg": "#f6f0e4",
+    "ink": "#2b2622",
+    "ink2": "#6b6258",
+    "accent": "#b5442b",
+    "highlight": "#2d6a8f",
+    "card": "#fffaf0"
+  },
+  "fonts": {
+    "display": {
+      "file": "fonts/newsreader-semibold.woff2",
+      "ttf": "fonts/newsreader-semibold.ttf",
+      "family": "Newsreader SemiBold",
+      "weight": 600,
+      "tracking": "-0.01em"
+    },
+    "body": {
+      "file": "fonts/inter-regular.woff2",
+      "ttf": "fonts/inter-regular.ttf",
+      "family": "Inter",
+      "weight": 400
+    }
+  },
+  "voice": { "elevenlabs": "", "openai": "sage", "piper": "en_US-amy-medium", "style": "measured and clear, a good lecturer" },
+  "music": { "mood": "calm", "level_db": -1 },
+  "sfx": { "enabled": true, "level_db": -3 },
+  "captions": { "style": "pill", "position": "bottom", "active_word": "accent" },
+  "cards": { "intro": { "text": "", "subtitle": "" }, "outro": { "text": "", "subtitle": "" } },
+  "safe_area": {},
+  "notes": [
+    "Dark ink on a light page: keep strokes at least 3 px wide so thin lines survive phone size."
+  ]
+}
