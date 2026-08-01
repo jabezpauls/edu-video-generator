@@ -67,8 +67,8 @@ fit(mob, max_w=0.9)              # scale down (never up) to a fraction of the sa
 ```
 
 `fmt` reads the environment once at import. To check a layout without `render.sh`:
-`EDU_FORMAT=9x16 manim --config_file <(python3 scenes/formats.py --config 9x16 med) ...`, or call
-`fmt.apply("med")` at the top of `construct`.
+`python3 scenes/formats.py --config 9x16 med > f.cfg` and
+`EDU_FORMAT=9x16 manim --config_file f.cfg scenes/scene_01.py Scene01`.
 
 ## Remotion: one composition per format
 
@@ -97,5 +97,5 @@ show a subtitle track. Burned captions respect the bottom safe area.
 
 ## Motion engine
 
-`C.pick(wide, square, tall)` does the same job inside the motion engine (see motion-engine.md
-once present). Presets and formats use the same ids everywhere.
+`C.pick(wide, square, tall)` does the same job inside the motion engine. Presets and formats use
+the same ids everywhere.
