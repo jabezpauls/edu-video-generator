@@ -34,3 +34,14 @@ def test_existing_files_are_kept_unless_forced(tmp_path):
 
 def test_unknown_engine(tmp_path):
     assert run(str(tmp_path), "motion2").returncode == 2
+
+
+def test_theme_comes_from_the_storyboard_preset(tmp_path):
+    (tmp_path / "storyboard.json").write_text('{"preset": "blueprint", "scenes": []}')
+    assert run(str(tmp_path), "remotion").returncode == 0
+    assert "#0b2545" in (tmp_path / "scenes" / "src" / "theme.ts").read_text()
+
+
+def test_theme_defaults_without_a_preset(tmp_path):
+    assert run(str(tmp_path), "manim").returncode == 0
+    assert "#0e1116" in (tmp_path / "scenes" / "theme.py").read_text()

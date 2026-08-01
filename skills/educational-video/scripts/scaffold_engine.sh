@@ -4,6 +4,8 @@
 #   manim:    <project>/scenes/{springs,formats}.py
 #   remotion: <project>/scenes/src/{springs.ts,formats.ts,SceneFormats.tsx}
 # Existing files are left alone unless --force is given, so scene code can edit its copy.
+# Also writes the theme (scenes/theme.py, scenes/src/theme.ts) from the storyboard's preset, or
+# from the blank preset's defaults when none is named, so scene code can always import it.
 set -euo pipefail
 
 PROJECT="${1:?usage: scaffold_engine.sh <project-dir> <manim|remotion> [--force]}"
@@ -34,3 +36,14 @@ case "$ENGINE" in
     exit 2
     ;;
 esac
+
+# Theme: apply the storyboard's preset (or refresh the theme only if it is missing).
+PRESET=""
+if [[ -f "$PROJECT/storyboard.json" ]]; then
+  PRESET="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" \
+    "$PROJECT/storyboard.json" 2>/dev/null || true)"
+fi
+THEME="$PROJECT/scenes/theme.py"; [[ "$ENGINE" == "remotion" ]] && THEME="$PROJECT/scenes/src/theme.ts"
+if [[ -n "$PRESET" || ! -e "$THEME" ]]; then
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apply_preset.py" "${PRESET:-blank}" "$PROJECT"
+fi
