@@ -5,8 +5,11 @@ from `storyboard.scenes[].template` (instead of writing raw animation) is what k
 consistent and minimizes critic-fix iterations. Each template encodes: safe-area margins,
 default font sizes, palette colors, and sensible enter/exit timing.
 
-Palette defaults (override via `storyboard.palette`): `bg #0e1116`, `fg #e6edf3`,
-`accent #58a6ff`, `accent2 #f78166`.
+Palette defaults: `bg #0e1116`, `fg #e6edf3`, `accent #58a6ff`, `accent2 #f78166`. When the
+storyboard names a `preset`, take colours and fonts from it instead (`theme.BG / INK / ACCENT /
+HIGHLIGHT` in Manim, `var(--bg)` / `var(--ink)` / `var(--accent)` / `var(--highlight)` in Remotion;
+see `presets.md`) and size and place everything per format (see `formats.md`). An explicit
+`storyboard.palette` overrides both. The hard-coded hex values below are the no-preset defaults.
 
 ## Template catalog
 
@@ -91,7 +94,10 @@ const Bullet: React.FC<{text:string}> = ({text}) => {
 
 ## Authoring rules
 
-- Always center or pad to a ≥5% safe-area margin; never hard-code coordinates that can overflow.
+- Always center or pad to a ≥5% safe-area margin (`place` / `fmt.safe_bounds()` in Manim, `f.safe`
+  in Remotion; 9:16 needs more); never hard-code coordinates that can overflow.
+- Re-block for tall formats: side-by-side templates become stacked (`split`, `f.pick("row","column")`).
+- Entrances use the shared springs (`springs.py` / `springs.ts`), not ad-hoc easing.
 - Scale text groups to ≤90% of frame width.
 - Use palette colors only, so all scenes look like one video.
 - Keep one main idea per template instance; compose multiple via the storyboard, not one mega-scene.
