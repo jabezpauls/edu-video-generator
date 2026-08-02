@@ -12,9 +12,16 @@ scenes/
   remotion.config.ts
   src/
     index.ts        # registerRoot(Root)
-    Root.tsx        # <Composition> registry — one per scene
+    Root.tsx        # scene registry: one <SceneFormats> per scene
     Scene01.tsx ... # scene components
+    springs.ts      # closed-form springs (same presets as Manim and the motion engine)
+    formats.ts      # useFormat(): 16x9 / 1x1 / 4x5 / 9x16 layout and safe areas
+    SceneFormats.tsx# registers a scene as one composition per format
+    theme.ts        # generated from the storyboard's preset: colours, CSS vars, fonts
+  public/fonts/     # the preset's .woff2 files
 ```
+
+`scripts/scaffold_engine.sh` (run by bootstrap) copies the helpers and writes `theme.ts`.
 
 `src/index.ts`:
 ```ts
@@ -25,39 +32,66 @@ registerRoot(Root);
 
 `src/Root.tsx` registers every scene as a composition:
 ```tsx
-import { Composition } from "remotion";
 import { Scene01 } from "./Scene01";
+import { SceneFormats } from "./SceneFormats";
 
 export const Root = () => (
   <>
-    <Composition id="Scene01" component={Scene01}
-      durationInFrames={12 * 30} fps={30} width={1920} height={1080} />
+    <SceneFormats id="Scene01" component={Scene01} seconds={12} />   {/* 16x9, 1x1, 4x5, 9x16 */}
   </>
 );
 ```
 
-Render: `npx remotion render src/index.ts Scene01 ../output/scene_01.mp4`.
+Composition ids: `Scene01` (16x9), `Scene01-1x1`, `Scene01-4x5`, `Scene01-9x16`. Render with
+`render.sh remotion <project> 01 high 9x16`, or directly:
+`npx remotion render src/index.ts Scene01-9x16 ../output/scene_01.9x16.mp4`.
 Single frame for the critic: `npx remotion still src/index.ts Scene01 out.png --frame=75`.
 
 ## Scene component
 
 ```tsx
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence } from "remotion";
+import { AbsoluteFill } from "remotion";
+import { useFormat } from "./formats";
+import { useSpring } from "./springs";
+import { SAFE_AREA, themeVars } from "./theme";
 
 export const Scene01: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const opacity = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp" });
-  const scale = spring({ frame, fps, config: { damping: 200 } });
+  const f = useFormat(SAFE_AREA);
+  const t = useSpring("heavy");                  // 0 -> 1, released at the scene start
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0e1116", justifyContent: "center", alignItems: "center" }}>
-      <h1 style={{ color: "#e6edf3", fontSize: 80, opacity, transform: `scale(${scale})` }}>
+    <AbsoluteFill style={{ ...themeVars, background: "var(--bg)", padding: f.safe.px,
+                           justifyContent: "center", alignItems: "center" }}>
+      <h1 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontSize: f.pick(96, 88, 92),
+                   margin: 0, opacity: Math.min(1, t * 2), transform: `translateY(${(1 - t) * 40}px)` }}>
         The Unit Circle
       </h1>
     </AbsoluteFill>
   );
 };
 ```
+
+## Springs (consistent motion)
+
+Use `springs.ts`, not Remotion's physics `spring()`: the same four presets and the same maths as
+Manim and the motion engine, so a lesson moves identically whichever engine draws it.
+
+| preset | feel | for |
+|---|---|---|
+| `snappy` | fast, ~1.5 % overshoot | toggles, leading edges, small items |
+| `default` | smooth, ~0.5 % overshoot | cards, containers, camera |
+| `heavy` | no overshoot | big type, titles |
+| `playful` | ~20 % overshoot | one-off emphasis only |
+
+```tsx
+const s = useSpring("snappy", 0.5);                    // hook: current frame, released at 0.5 s
+const x = spring(t, 1.0, 0, 300, "default");           // t in seconds: from 0 to 300, released at 1.0 s
+const y = track(t, [[0, 0], [1, 100], [2, -50]]);      // several targets, no restarts
+const frames = Math.round(settle("heavy") * fps);      // how long it takes to settle
+```
+
+A spring is 0 before its release time and settles within `settle(preset)` seconds. Drive entrances
+from `useSpring` rather than `interpolate` over a fixed frame range, and avoid pure-opacity
+fades for primary elements: pair them with a spring move.
 
 ## Core APIs
 
@@ -102,5 +136,7 @@ Wrap content in a padded container (≥5% margins). Use `fontSize` ≥ ~36px at 
 | Blank/black frame | animating before mount / opacity 0 | Check `interpolate` ranges; clamp extrapolation. |
 | Element off-screen | absolute positioning overflow | Use fl/center via `AbsoluteFill` + flexbox; add padding. |
 | Animation janky/instant | wrong frame math | Multiply seconds by `fps`; clamp `interpolate`. |
-| Font not applied | font not loaded | Load via `@remotion/google-fonts` and set `fontFamily`. |
+| Font not applied | font not loaded | Import `./theme` (it loads the preset's fonts and holds the render) and use `var(--font-display)`; with no preset, load via `@remotion/google-fonts`. |
+| Layout wrong in 9:16 | scene written for 16:9 | Read `useFormat()` and use `f.pick(...)` / `f.safe`; render the `Scene01-9x16` composition. |
+| `Composition with id "Scene01-9x16" not found` | scene registered with `<Composition>` only | Register with `<SceneFormats>`. |
 | Render slow | high concurrency/quality | Render scenes individually; lower `--concurrency` if OOM. |
