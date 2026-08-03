@@ -13,9 +13,10 @@ import sys
 def find_piper(project: str | None) -> str | None:
     # explicit project-local install first
     if project:
-        cand = os.path.join(project, "assets", "tts", "piper")
-        if os.path.isfile(cand) and os.access(cand, os.X_OK):
-            return cand
+        for cand in (os.path.join(project, "assets", "tts", "piper"),
+                     os.path.join(project, ".venv", "bin", "piper")):
+            if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                return cand
     return shutil.which("piper")
 
 
@@ -29,7 +30,7 @@ def main() -> int:
         desc = {"provider": "openai", "model": "gpt-4o-mini-tts",
                 "word_timestamps": False}
     elif find_piper(project):
-        desc = {"provider": "piper", "model": "en_US-amy-medium",
+        desc = {"provider": "piper", "model": os.environ.get("PIPER_VOICE", "en_US-amy-medium"),
                 "word_timestamps": False, "bin": find_piper(project)}
     elif shutil.which("espeak-ng"):
         desc = {"provider": "espeak-ng", "model": "default",

@@ -114,6 +114,41 @@ ROOT
   fi
 fi
 
+# --- Audio stack: narration voice, word alignment, music/mix helpers ---
+# Lives in the same uv venv as Manim (created here when the engine doesn't need one).
+PIPER_VOICE="${PIPER_VOICE:-en_US-amy-medium}"
+if have uv; then
+  VENV_PY="$PROJECT/.venv/bin/python"
+  if [[ ! -x "$VENV_PY" ]]; then
+    log "creating venv ($PYVER) for the audio stack"
+    uv venv --python "$PYVER" "$PROJECT/.venv" >/dev/null 2>&1 || warn "uv venv failed"
+  fi
+  if [[ -x "$VENV_PY" ]]; then
+    PKGS=(numpy scipy soundfile)
+    NEED_ASR=false
+    # Piper is the offline default: install it unless a cloud TTS key or a system piper exists.
+    if [[ -z "${ELEVENLABS_API_KEY:-}" && -z "${OPENAI_API_KEY:-}" ]] \
+       && ! have piper && [[ ! -x "$PROJECT/.venv/bin/piper" ]]; then
+      PKGS+=(piper-tts); NEED_ASR=true
+    fi
+    [[ -z "${ELEVENLABS_API_KEY:-}" ]] && NEED_ASR=true   # only ElevenLabs returns word times
+    $NEED_ASR && PKGS+=(faster-whisper)
+    log "installing audio packages: ${PKGS[*]}"
+    VIRTUAL_ENV="$PROJECT/.venv" uv pip install --python "$VENV_PY" -q "${PKGS[@]}" \
+      || warn "audio package install had issues (re-run bootstrap, or see references/troubleshooting.md)"
+    if [[ -x "$PROJECT/.venv/bin/piper" ]]; then
+      mkdir -p "$PROJECT/assets/tts"
+      if [[ ! -f "$PROJECT/assets/tts/$PIPER_VOICE.onnx" ]]; then
+        log "downloading Piper voice $PIPER_VOICE"
+        "$VENV_PY" -m piper.download_voices --download-dir "$PROJECT/assets/tts" "$PIPER_VOICE" \
+          >/dev/null 2>&1 || warn "could not download Piper voice $PIPER_VOICE"
+      fi
+    fi
+  fi
+else
+  warn "uv not found — audio stack (Piper, alignment, music) not installed"
+fi
+
 # --- TTS detection ---
 TTS_JSON="{}"
 if [[ -f "$(dirname "$0")/detect_tts.py" ]]; then
