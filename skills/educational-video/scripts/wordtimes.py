@@ -137,13 +137,19 @@ def whisper_words(wav):
             print(f"warning: faster-whisper unavailable ({e}); estimating word timings",
                   file=sys.stderr)
             return []
-    model = WhisperModel("base", device="cpu", compute_type="int8")
-    segments, _ = model.transcribe(wav, word_timestamps=True)
-    words = []
-    for seg in segments:
-        for w in (seg.words or []):
-            words.append({"word": w.word.strip(), "start": w.start, "end": w.end})
-    return words
+    try:
+        import numpy as np
+        # decode with ffmpeg ourselves: faster-whisper's bundled decoder breaks on some PyAV builds
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", wav, "-f", "f32le", "-ac", "1",
+                              "-ar", "16000", "-"], capture_output=True, check=True).stdout
+        audio = np.frombuffer(raw, dtype=np.float32)
+        model = WhisperModel("base", device="cpu", compute_type="int8")
+        segments, _ = model.transcribe(audio, word_timestamps=True)
+        return [{"word": w.word.strip(), "start": w.start, "end": w.end}
+                for seg in segments for w in (seg.words or [])]
+    except Exception as e:  # noqa: BLE001
+        print(f"warning: forced alignment failed ({e}); estimating word timings", file=sys.stderr)
+        return []
 
 
 def scene_words(project, sid, text, use_asr=True):
