@@ -9,6 +9,10 @@ REPO = Path(__file__).resolve().parents[2]
 SKILL = REPO / "skills" / "educational-video"
 SCRIPTS = SKILL / "scripts"
 
+# scripts import each other by file name when run directly
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
 
 def load_script(name: str):
     """Import a script from the skill's scripts/ dir by file name (without .py)."""
