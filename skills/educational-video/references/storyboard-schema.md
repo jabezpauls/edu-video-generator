@@ -61,7 +61,8 @@ is optional, so storyboards written against the original schema keep validating 
   `9x16` (1080x1920). Non-empty, no duplicates. The first entry is the primary format; the
   legacy `aspect_ratio`/`resolution` fields only matter when `formats` is absent.
 - **preset**: lowercase slug (`[a-z0-9_-]`) naming a look preset (palette, fonts, voice, music).
-  Omit it to use the default look. An explicit `palette` overrides the preset's colours.
+  Omit it to use the default look. An explicit `palette` overrides the preset's colours. Shipped:
+  `chalkboard`, `paper`, `blueprint` (and `blank` for building your own); see `presets.md`.
 - **engine**: `manim`, `remotion` or `motion`; `null` is allowed until engine selection has run.
 - **palette**: optional object of colour name to hex string (`#rgb`, `#rrggbb`, `#rrggbbaa`).
 

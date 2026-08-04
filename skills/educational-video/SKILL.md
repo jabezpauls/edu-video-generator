@@ -77,10 +77,14 @@ raw animation — templates encode safe-area margins, font sizes, and a consiste
 prevents most critic failures.
 - Manim → `scenes/scene_<id>.py` (one `Scene` subclass per storyboard scene).
 - Remotion → `scenes/Scene<Id>.tsx`, registered in `src/Root.tsx`.
+- Both engines get `springs`, `formats` and a preset `theme` in the project (`scripts/scaffold_engine.sh`,
+  run by bootstrap; `scripts/apply_preset.py` re-applies a preset). Use them for motion, layout
+  per format and colours/fonts: `references/formats.md`, `references/presets.md`.
 
 ### Phase 5 — Render
 Render per scene first (fast iteration): `scripts/render.sh <engine> <project> <scene> <quality>`
-(use medium quality while iterating, high for the final pass). Capture exit code + stderr to
+(use medium quality while iterating, high for the final pass). Add a format (`16x9`, `1x1`,
+`4x5`, `9x16`, or `all` for every format in the storyboard) as a fifth argument to render per format. Capture exit code + stderr to
 `.videogen/logs/scene_<id>.render.log`.
 
 ### Phase 6 — Verify (core loop, per scene)
@@ -133,6 +137,8 @@ any unresolved critic warnings.
 - `references/manim-patterns.md` — Manim API snippets + error→fix table (RITL-DOC corpus).
 - `references/remotion-patterns.md` — Remotion API snippets + error→fix table (RITL-DOC corpus).
 - `references/component-library.md` — reusable templates for both engines.
+- `references/formats.md` — 16x9 / 1x1 / 4x5 / 9x16, safe areas, re-blocking, per-engine helpers.
+- `references/presets.md` — looks (chalkboard, paper, blueprint, blank): file format and how engines use it.
 - `references/verify-loop.md` — RITL + vision-critic rubric, frame sampling, retry caps.
 - `references/tts-setup.md` — provider detection, recipes, alignment fallback.
 - `references/troubleshooting.md` — Python 3.14/Manim, LaTeX, cairo/pango, ffmpeg, Chrome shell.
