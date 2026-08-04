@@ -43,14 +43,20 @@ references/               # knowledge corpus (read on demand)
   remotion-patterns.md    # Remotion snippets + error→fix table
   component-library.md     # reusable templates (both engines)
   verify-loop.md          # RITL + vision-critic rubric
+  formats.md              # 16x9 / 1x1 / 4x5 / 9x16, safe areas, re-blocking
+  presets.md              # looks: file format, how Manim and Remotion use them
   tts-setup.md            # provider detection + recipes
   troubleshooting.md      # known failure modes + fixes
+presets/                 # blank (documented), chalkboard, paper, blueprint + OFL fonts
+templates/               # helpers copied into projects: springs + formats for Manim and Remotion
 scripts/                 # deterministic helpers
   bootstrap.sh            # env setup (uv venv 3.12, Manim, Remotion, TTS)
   detect_tts.py           # resolve TTS provider → JSON
   new_project.sh          # per-run scaffold + manifest/storyboard stubs
   validate_storyboard.py  # storyboard validation
-  render.sh               # unified render (manim|remotion)
+  render.sh               # unified render (manim|remotion), optional per-format
+  scaffold_engine.sh      # springs, formats and preset theme into a Manim/Remotion project
+  apply_preset.py         # preset -> fonts, scenes/theme.py, scenes/src/theme.ts
   extract_frames.sh       # critic frames (ffmpeg / remotion still)
   tts.py                  # per-scene narration synthesis
   align_subtitles.py      # .srt/.ass from word timings or forced alignment
