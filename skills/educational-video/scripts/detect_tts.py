@@ -16,7 +16,7 @@ def find_piper(project: str | None) -> str | None:
         for cand in (os.path.join(project, "assets", "tts", "piper"),
                      os.path.join(project, ".venv", "bin", "piper")):
             if os.path.isfile(cand) and os.access(cand, os.X_OK):
-                return cand
+                return os.path.abspath(cand)
     return shutil.which("piper")
 
 

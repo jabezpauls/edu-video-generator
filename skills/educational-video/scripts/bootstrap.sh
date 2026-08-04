@@ -14,6 +14,7 @@ warn() { printf '\033[1;33m[bootstrap]\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 mkdir -p "$PROJECT/.videogen"
+PROJECT="$(cd "$PROJECT" && pwd)"   # env.json records absolute paths
 ENVJSON="$PROJECT/.videogen/env.json"
 MANIM_OK=false; REMOTION_OK=false
 
