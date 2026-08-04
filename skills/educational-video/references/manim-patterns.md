@@ -16,6 +16,22 @@ class Scene01(Scene):
         self.wait(1)
 ```
 
+With helpers (the bootstrap copies `springs.py` and `formats.py` into `scenes/` and writes
+`theme.py` from the storyboard's preset; see `presets.md`, `formats.md`):
+
+```python
+from manim import *
+import theme
+from formats import fmt, split, place
+from springs import spring, settle
+
+class Scene01(Scene):
+    def construct(self):
+        theme.setup(self)                       # preset background, fonts, frame for this format
+        title = place(theme.title("The Unit Circle"), "title")
+        self.play(FadeIn(title, shift=UP * 0.3), rate_func=spring("heavy"), run_time=settle("heavy"))
+```
+
 Render: `manim -qm scenes/scene_01.py Scene01` (medium). Final: `-qh`. Output lands under
 `media/videos/scene_01/<quality>/Scene01.mp4` — `render.sh` copies it to `output/scene_01.mp4`.
 
@@ -49,9 +65,41 @@ Map storyboard `action`s: `write→Write`, `draw→Create`, `fade_in→FadeIn`, 
 `transform→Transform`, `highlight/indicate→Indicate`, `move→.animate.shift`, `scale→.animate.scale`,
 `slide_in→FadeIn(shift=...)`, `pop_in→GrowFromCenter`.
 
+## Springs (consistent motion)
+
+`springs.py` gives Manim the same four spring presets as Remotion and the motion engine, as
+closed-form rate functions: `snappy` (toggles, leading edges), `default` (cards, containers),
+`heavy` (big type, titles; no overshoot), `playful` (one-off emphasis; ~20 % overshoot).
+
+```python
+from springs import spring, settle
+self.play(obj.animate.shift(RIGHT * 2), rate_func=spring("snappy"), run_time=settle("snappy"))
+```
+
+- `run_time=settle(name)` plays the true spring; a longer `run_time` just slows the same curve.
+- Use springs for moves, scales, shifts, fades and rotations. Keep the default `smooth` / `linear`
+  for `Create`, `Write` and `DrawBorderThenFill`, or use `heavy` / `snappy`: overshoot above 1.0
+  breaks the partial-draw animations.
+- Don't mix in `rush_into` / `there_and_back` for ordinary entrances; one family of motion per video.
+
+## Formats (16x9, 1x1, 4x5, 9x16)
+
+`render.sh manim <project> <scene> <quality> <format|all>` sets the frame per format. The short
+side is always 8 units, so a font size means the same pixels everywhere; only the long side grows
+(14.22 x 8 wide, 8 x 14.22 tall). Re-block with `formats.py` instead of hard-coding positions:
+
+```python
+group = split(plot, equation)       # side by side on 16x9, stacked on 1x1 / 4x5 / 9x16
+place(caption, "caption")           # inside the safe area for this format
+fmt.pick(wide, square, tall)        # per-format numbers (font size, buff, scale)
+```
+
+Hard-coded `to_edge(LEFT)` / `RIGHT * 4` layouts only work on 16x9. See `formats.md`.
+
 ## Positioning (respect safe area)
 
-Frame is ~14.22 wide × 8 tall (units). Keep content within ~90%.
+On 16x9 the frame is 14.22 wide × 8 tall (units); other formats are in `formats.md`. Keep
+content inside the safe area (`fmt.safe_bounds()`, 5 % margins, more on 9x16).
 ```python
 obj.to_edge(UP, buff=0.6)          # near top, with margin
 obj.to_corner(UL)                  # corner
@@ -80,3 +128,7 @@ Total scene time ≈ sum of `run_time`s + `wait`s. To stretch a scene to N secon
 | 3D looks flat | missing camera orientation | `self.set_camera_orientation(phi=..., theta=...)`. |
 | Render very slow | high quality during iteration | Use `-qm` until final, `-qh` only for delivery. |
 | Colors invisible on bg | low contrast | Set `self.camera.background_color` and pick fg from the palette. |
+| `Text` shows the wrong font | preset font not registered | Call `theme.setup(self)` first; use `font=theme.FONT_DISPLAY`. Family must match the `.ttf`'s own name (`fc-scan`). |
+| Content clipped / tiny on 9x16 | layout written for 16x9 | Use `split` / `stack` / `place` from `formats.py`; check `fmt.id`. |
+| `ModuleNotFoundError: formats` | helper not in the project | Run `scripts/scaffold_engine.sh <project> manim`. |
+| Create/Write glitches with a spring | overshoot > 1 in a partial-draw animation | Use `spring("heavy")` or the default rate function there. |

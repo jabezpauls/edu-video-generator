@@ -1,0 +1,38 @@
+// Blueprint: deep navy with cyan linework and a technical grotesque. For algorithms, systems,
+// engineering and anything that should feel like a drawing.
+{
+  "name": "Blueprint",
+  "description": "Navy drawing board, cyan linework, amber emphasis, mono body.",
+  "colors": {
+    "bg": "#0b2545",
+    "ink": "#e8f1ff",
+    "ink2": "#8fb3de",
+    "accent": "#4cc9f0",
+    "highlight": "#ffd166",
+    "card": "#13315c"
+  },
+  "fonts": {
+    "display": {
+      "file": "fonts/space-grotesk-semibold.woff2",
+      "ttf": "fonts/space-grotesk-semibold.ttf",
+      "family": "Space Grotesk SemiBold",
+      "weight": 600,
+      "tracking": "-0.02em"
+    },
+    "body": {
+      "file": "fonts/ibm-plex-mono-regular.woff2",
+      "ttf": "fonts/ibm-plex-mono-regular.ttf",
+      "family": "IBM Plex Mono",
+      "weight": 400
+    }
+  },
+  "voice": { "elevenlabs": "", "openai": "onyx", "piper": "en_US-amy-medium", "style": "precise, even pace, no filler" },
+  "music": { "mood": "curious", "level_db": -1 },
+  "sfx": { "enabled": true, "level_db": 0 },
+  "captions": { "style": "pill", "position": "bottom", "active_word": "highlight" },
+  "cards": { "intro": { "text": "", "subtitle": "" }, "outro": { "text": "", "subtitle": "" } },
+  "safe_area": {},
+  "notes": [
+    "Linework first: thin cyan strokes and labels in the mono face; amber only for the term being explained."
+  ]
+}

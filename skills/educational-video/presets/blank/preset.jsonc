@@ -1,0 +1,79 @@
+// BLANK PRESET: every field a preset can set, with what it does. Copy this folder to
+// presets/<your-look>/ (or to <project>/presets/<your-look>/), fill in what you care about and
+// leave the rest. Empty ("" / null / []) means "use the default", never an error.
+//
+// Use it by name in the storyboard ("preset": "<your-look>") or apply it to a project:
+//   python3 scripts/apply_preset.py <your-look> <project-dir>
+// Manim and Remotion read the generated theme files; the motion engine reads this file directly.
+{
+  // Shown in logs and in the critique brief.
+  "name": "Blank preset",
+  // One line on the look and when to use it.
+  "description": "",
+
+  // Colour tokens, hex values. Every lesson uses these and nothing else, so scenes look like one
+  // video. House rule: ONE accent for the main thing, ONE highlight for emphasis in derivations.
+  "colors": {
+    "bg": "",         // canvas. Default #0e1116
+    "ink": "",        // headlines, equations, primary text. Default #e6edf3
+    "ink2": "",       // body and secondary text, axes, labels. Default #9aa7b4
+    "accent": "",     // the one accent: the object the lesson is about. Default #58a6ff
+    "highlight": "",  // emphasis hue used for the term being explained. Default #f78166
+    "card": ""        // panels, code blocks, chart backgrounds. Default #161b22
+  },
+
+  // One display face (titles, big numbers) and one body face (everything else). Only fonts you
+  // may redistribute (SIL OFL, from Google Fonts / Fontsource) belong in a shared preset: put the
+  // licence text next to them (fonts/OFL-<name>.txt).
+  "fonts": {
+    "display": {
+      "file": "",         // .woff2, relative to this folder, e.g. "fonts/display.woff2". Remotion and the motion engine load it.
+      "ttf": "",          // matching .ttf for Manim (Pango cannot read woff2), e.g. "fonts/display.ttf"
+      "family": "",       // the family name Manim passes to Text(font=...) and CSS uses as font-family. Must match the .ttf's own family name
+      "weight": null,     // CSS weight of the .woff2, e.g. 700. Manim takes it from the .ttf
+      "tracking": ""      // letter-spacing for display text, e.g. "-0.02em"
+    },
+    "body": {
+      "file": "",
+      "ttf": "",
+      "family": "",
+      "weight": null
+    }
+  },
+
+  // Narration. The provider is still chosen by detect_tts.py (a key in the environment wins); this
+  // only says which voice to use with each provider.
+  "voice": {
+    "elevenlabs": "",     // ElevenLabs voice id
+    "openai": "",         // OpenAI voice name, e.g. "alloy"
+    "piper": "",          // Piper model name, e.g. "en_US-amy-medium"
+    "style": ""           // delivery note for the script writer, e.g. "calm, unhurried, one idea per sentence"
+  },
+
+  // Sound bed. mood: "calm" | "curious" | "upbeat" | "none". level_db is relative to the bed's
+  // default level (0 = default, -3 = quieter).
+  "music": { "mood": "", "level_db": 0 },
+  // Cue sounds (pop, tick, whoosh, chime). enabled: false mutes them; level_db as for music.
+  "sfx": { "enabled": true, "level_db": 0 },
+
+  // Burned-in captions (always on for 9:16 shorts). style: "pill" (text on a rounded card),
+  // "outline" (text with a dark stroke), "plain". position: "bottom" | "center".
+  // active_word colours the word being spoken: "accent" | "highlight" | "".
+  "captions": { "style": "", "position": "", "active_word": "" },
+
+  // Optional title and end cards. Leave text empty for none.
+  "cards": {
+    "intro": { "text": "", "subtitle": "" },
+    "outro": { "text": "", "subtitle": "" }
+  },
+
+  // Fractions of the frame kept clear of content, per format ("all" applies to every format, a
+  // format id overrides it). Defaults: 5 % margins; 9x16 also keeps top 14 %, bottom 20 %, right 12 %.
+  "safe_area": {
+    // "all":  { "top": 0.05, "bottom": 0.05, "left": 0.05, "right": 0.05 },
+    // "9x16": { "bottom": 0.22 }
+  },
+
+  // House notes for the writer and the critic, one rule per string.
+  "notes": []
+}
