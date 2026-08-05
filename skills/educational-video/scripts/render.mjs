@@ -10,7 +10,7 @@
 //   --range 3,5 | --scene 02 [--blur 0]                         a clip: seconds 3-5, or one scene by storyboard id
 //   --mux [--all]                                               re-mux audio/mix.wav into existing renders without re-rendering
 //   --verify [--all]                                            determinism check: 12 probes, cold vs after seeking elsewhere
-//   options: --fps N  --blur 0|1 (default 1 for finals)  --crf N  --audio path (default audio/mix.wav if present)  --out file
+//   options: --tag name (output prefix)  --fps N  --blur 0|1 (default 1 for finals)  --crf N  --audio path (default audio/mix.wav if present)  --out file
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,6 +41,7 @@ const ALL = TL.formats || ['16x9'];
 const FORMATS = has('all') ? ALL : [opt('fmt', ALL[0])];
 for (const f of FORMATS) if (!SIZES[f]) die(`unknown format "${f}" (use ${Object.keys(SIZES).join(', ')})`);
 const DRAFT = has('draft');
+const TAG = String(opt('tag', DRAFT ? 'draft' : '')).replace(/[^\w-]/g, '') ;   // output name prefix: renders/<tag>_<fmt>.mp4
 const AUDIO = path.resolve(ROOT, String(opt('audio', 'audio/mix.wav')));
 const hasAudio = fs.existsSync(AUDIO);
 const mkdir = (d) => fs.mkdirSync(d, { recursive: true });
@@ -203,7 +204,7 @@ for (const fmt of FORMATS) {
     }
     if (!(b > a) || a < 0 || b > F.DUR + 1e-6) { console.error(`render: bad range ${a}-${b} (film is 0-${F.DUR}s)`); await quit(1); }
     const clip = has('range') || has('scene');
-    const out = path.resolve(ROOT, String(opt('out', path.join('renders', clip ? `${tag}.mp4` : `${DRAFT ? 'draft_' : ''}${fmt}.mp4`))));
+    const out = path.resolve(ROOT, String(opt('out', path.join('renders', clip ? `${tag}.mp4` : `${TAG ? TAG + '_' : ''}${fmt}.mp4`))));
     mkdir(path.dirname(out));
     const withAudio = hasAudio;
     const { p, done } = ffmpeg([
