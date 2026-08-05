@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Word-level timing helpers shared by grid.py and align_subtitles.py.
 
 A "word" is {"word": str, "start": float, "end": float} in seconds from the start of one
