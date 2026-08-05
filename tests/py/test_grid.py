@@ -161,3 +161,56 @@ def test_cli_build_resolve_and_cue(tmp_path):
     r = run("cue", str(tmp_path), "s01.rotates#2")
     assert float(r.stdout) == pytest.approx(g["cues"]["s01.rotates#2"], abs=1e-3)
     assert run("cue", str(tmp_path), "s01.zebra").returncode == 1
+
+
+# ---- sfx plan ----
+
+def plan(grid, story=STORY, **kw):
+    g = make(grid, lead=0.4)
+    res = grid.resolve_beats(story, g)
+    return g, grid.sfx_cues(story, g, res, **kw)
+
+
+def test_sfx_cues_follow_beats_and_scene_changes(grid):
+    g, out = plan(grid)
+    types = [(c["type"], c["what"]) for c in out["cues"]]
+    assert ("pop", "pop_in dot") in types and ("whoosh", "scene 02 in") in types
+    assert out["cues"] == sorted(out["cues"], key=lambda c: c["t"])
+    pop = next(c for c in out["cues"] if c["what"] == "pop_in dot")
+    assert pop["t"] == pytest.approx(g["cues"]["s01.rotates#2"], abs=1e-3)
+    whoosh = next(c for c in out["cues"] if c["type"] == "whoosh")
+    assert whoosh["t"] == pytest.approx(g["scenes"][1]["start"], abs=0.05)
+    assert out["duration"] == g["duration"] and out["sr"] == 48000
+
+
+def scene1_only():
+    story = json.loads(json.dumps(STORY))
+    story["scenes"][1]["beats"] = []
+    return story
+
+
+def test_sfx_beat_override_and_silence(grid):
+    story = scene1_only()
+    story["scenes"][0]["beats"] = [
+        {"t": 1.0, "action": "write", "target": "eq", "sfx": "chime"},
+        {"t": 2.0, "action": "pop_in", "target": "dot", "sfx": "none"},
+        {"t": 3.0, "action": "mystery", "target": "q"}]
+    _, out = plan(grid, story, transitions=False)
+    assert [c["type"] for c in out["cues"]] == ["chime"]
+
+
+def test_sfx_typing_on_code_ticks_and_close_hits_merge(grid):
+    story = scene1_only()
+    story["scenes"][0]["elements"] = [{"kind": "code", "label": "snippet", "value": "x"}]
+    story["scenes"][0]["beats"] = [
+        {"t": 1.0, "action": "write", "target": "snippet"},
+        {"t": 1.03, "action": "pop_in", "target": "other"}]
+    _, out = plan(grid, story, transitions=False)
+    assert len(out["cues"]) == 1  # 30 ms apart: one sound, the louder one
+    story["scenes"][0]["beats"] = [{"t": 1.0, "action": "write", "target": "snippet"}]
+    assert plan(grid, story, transitions=False)[1]["cues"][0]["type"] == "tick"
+
+
+def test_sfx_is_seeded(grid):
+    assert plan(grid)[1] == plan(grid)[1]
+    assert plan(grid)[1]["cues"][0]["pitch"] != plan(grid, seed=7)[1]["cues"][0]["pitch"]

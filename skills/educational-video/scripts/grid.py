@@ -15,6 +15,7 @@ Usage:
   grid.py [build] <project> [--lead S] [--tail S] [--min-scene S] [--no-asr] [--write-durations]
   grid.py resolve <project>        beat `on` anchors -> beats.resolved.json
   grid.py cue <project> <cue>      print one cue's time (e.g. s02.derivative#2)
+  grid.py cues <project>           derive cues.json (sfx plan) from beats + scene changes
 """
 import argparse
 import json
@@ -190,6 +191,74 @@ def resolve_beats(sb, grid):
     return {"scenes": out}
 
 
+# ---- sfx plan -------------------------------------------------------------------------------
+
+# storyboard action -> sound. Primary hits carry the lesson, the rest are texture.
+ACTION_SFX = {"pop_in": ("pop", 0.7), "fade_in": ("pop", 0.55), "draw": ("pop", 0.55),
+              "slide_in": ("pop", 0.6), "write": ("pop", 0.6), "transform": ("whoosh", 0.55),
+              "move": ("whoosh", 0.4), "highlight": ("click", 0.5), "indicate": ("click", 0.5),
+              "scale": ("pop", 0.45)}
+SFX_TYPES = ("pop", "click", "tick", "whoosh", "chime", "thump")
+MIN_GAP = 0.09   # never stack two sounds on one frame
+
+
+def _mulberry(seed):
+    a = seed & 0xFFFFFFFF
+    while True:
+        a = (a + 0x6D2B79F5) & 0xFFFFFFFF
+        t = ((a ^ (a >> 15)) * (1 | a)) & 0xFFFFFFFF
+        t = (t + (((t ^ (t >> 7)) * (61 | t)) & 0xFFFFFFFF)) ^ t
+        yield ((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
+
+
+def sfx_cues(sb, grid, resolved, seed=2026, transitions=True):
+    """Cue list (kit cues.json shape) from beats and scene changes.
+
+    A beat may override its sound with {"sfx": "chime"} or silence it with {"sfx": "none"}.
+    A beat on a code element (or whose target mentions "code"/"typing") ticks instead of popping.
+    Whooshes peak on the first beat of the following scene, so they land with the new picture.
+    """
+    rnd = _mulberry(seed)
+    cues = []
+    code_targets = set()
+    for sc in sb["scenes"]:
+        for el in sc.get("elements") or []:
+            if el.get("kind") == "code":
+                code_targets.add((el.get("label") or el.get("target") or "code").lower())
+
+    def add(t, typ, gain, what):
+        cues.append({"t": round(t, 4), "type": typ, "gain": gain,
+                     "pitch": round(0.94 + next(rnd) * 0.12, 3),
+                     "pan": round((next(rnd) - 0.5) * 0.5, 3), "what": what})
+
+    for i, rs in enumerate(resolved["scenes"]):
+        if transitions and i > 0:
+            add(rs["start"] + 0.02, "whoosh", 0.45, f"scene {rs['id']} in")
+        for b in rs["beats"]:
+            want = b.get("sfx")
+            if want == "none":
+                continue
+            typ, gain = ACTION_SFX.get(b.get("action"), (None, 0))
+            if want in SFX_TYPES:
+                typ, gain = want, (gain or 0.6)
+            if typ is None:
+                continue
+            tgt = str(b.get("target", "")).lower()
+            if typ == "pop" and b.get("action") == "write" and (tgt in code_targets or "code" in tgt):
+                typ, gain = "tick", 0.45
+            add(b["at"], typ, gain, f"{b.get('action')} {b.get('target', '')}".strip())
+    cues.sort(key=lambda c: c["t"])
+    kept = []
+    for c in cues:
+        if kept and c["t"] - kept[-1]["t"] < MIN_GAP:
+            if c["gain"] > kept[-1]["gain"]:
+                kept[-1] = c
+            continue
+        kept.append(c)
+    kept = [c for c in kept if c["t"] < grid["duration"]]
+    return {"sr": 48000, "duration": grid["duration"], "source": "grid", "cues": kept}
+
+
 # ---- CLI ------------------------------------------------------------------------------------
 
 def _load(project, name):
@@ -258,9 +327,22 @@ def cmd_cue(a):
         return 1
 
 
+def cmd_cues(a):
+    sb, grid = _load(a.project, "storyboard.json"), _load(a.project, "grid.json")
+    try:
+        res = resolve_beats(sb, grid)
+    except GridError as e:
+        print(f"unresolved anchors:\n{e}", file=sys.stderr)
+        return 1
+    data = sfx_cues(sb, grid, res)
+    path = _dump(a.project, "cues.json", data)
+    print(f"-> {path}  {len(data['cues'])} sfx cues")
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    cmds = {"build", "resolve", "cue"}
+    cmds = {"build", "resolve", "cue", "cues"}
     if not argv or argv[0] not in cmds:
         argv.insert(0, "build")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -281,6 +363,9 @@ def main(argv=None):
     c.add_argument("project")
     c.add_argument("cue")
     c.set_defaults(fn=cmd_cue)
+    s = sub.add_parser("cues")
+    s.add_argument("project")
+    s.set_defaults(fn=cmd_cues)
     a = ap.parse_args(argv)
     return a.fn(a)
 
