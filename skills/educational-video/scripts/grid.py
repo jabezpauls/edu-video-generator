@@ -105,6 +105,7 @@ def build(sb, words_for, lead=DEFAULT_LEAD, tail=DEFAULT_TAIL, min_scene=DEFAULT
             "speech_start": out_words[0]["start"] if out_words else None,
             "speech_end": s_end if out_words else None,
             "audio": f"audio/scene_{sid}.wav" if audio_s else None,
+            "audio_start": round(t0 + pre, 4) if audio_s else None,   # where the wav is placed
             "words_source": source, "words": out_words, "phrases": phrases,
         })
         t0 += duration
