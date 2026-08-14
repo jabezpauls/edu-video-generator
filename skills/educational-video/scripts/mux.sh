@@ -59,7 +59,8 @@ for row in "${ROWS[@]}"; do
   ffmpeg -y -i "$v" -an -vf "$filt" -t "$want" -c:v libx264 -preset medium -crf 18 \
     -pix_fmt yuv420p "$seg" >/dev/null 2>&1 \
     || { echo "could not conform scene $id" >&2; exit 1; }
-  echo "file '$(cd "$TMP" && pwd)/seg_${id}.mp4'" >> "$LIST"
+  segpath="$(cd "$TMP" && pwd)/seg_${id}.mp4"
+  echo "file '${segpath//\'/\'\\\'\'}'" >> "$LIST"   # concat-demuxer quoting for paths with quotes
 done
 
 # 2. Concat the conformed scenes (identical encodes, so stream copy)
