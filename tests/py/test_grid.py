@@ -214,3 +214,15 @@ def test_sfx_typing_on_code_ticks_and_close_hits_merge(grid):
 def test_sfx_is_seeded(grid):
     assert plan(grid)[1] == plan(grid)[1]
     assert plan(grid)[1]["cues"][0]["pitch"] != plan(grid, seed=7)[1]["cues"][0]["pitch"]
+
+
+def test_audio_is_placed_after_the_lead_in(grid):
+    def words_for(sc):
+        return words(sc["narration"]), "provider", 2.4
+    g = grid.build(STORY, words_for, lead=0.5, tail=1.0)
+    s1, s2 = g["scenes"][0], g["scenes"][1]
+    assert s1["audio"] == "audio/scene_01.wav"
+    assert s1["audio_start"] == pytest.approx(0.5)
+    assert s2["audio_start"] == pytest.approx(s2["start"] + 0.5)
+    # the scene is long enough for the wav (or its words), whichever ends later
+    assert s1["duration"] >= 0.5 + 2.4 + 1.0
