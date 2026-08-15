@@ -1,4 +1,4 @@
-"""Read narration-grid cues from a Manim scene (copy to <project>/scenes/gridsync.py).
+r"""Read narration-grid cues from a Manim scene (copy to <project>/scenes/gridsync.py).
 
     from gridsync import GridScene
 
