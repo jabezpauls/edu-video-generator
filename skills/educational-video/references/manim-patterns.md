@@ -61,10 +61,41 @@ VGroup(a,b).arrange(DOWN, buff=0.5).move_to(ORIGIN)  # stack & center
 ```
 Prevent overlap: build groups with `.arrange()` and `buff`; never hard-code overlapping coords.
 
-## Timing to match narration
+## Timing to match narration (read the grid)
 
-Total scene time ≈ sum of `run_time`s + `wait`s. To stretch a scene to N seconds, add
-`self.wait(extra)` at the end (the Phase-9 reconciliation does this automatically).
+Scene length and beat times come from `grid.json` (see `audio.md`), never from guesses. Copy
+`templates/gridsync.py` to `scenes/gridsync.py` and subclass `GridScene`:
+
+```python
+from manim import *
+from gridsync import GridScene
+
+class Scene01(GridScene):
+    SCENE_ID = "01"                      # storyboard scene id
+
+    def construct(self):
+        title = Text("i times z").to_edge(UP)
+        self.play(FadeIn(title), run_time=0.8)
+        self.wait_until("rotates")       # hold until the word is said (starts 0.06 s early)
+        self.play(FadeIn(dot, scale=0.4), run_time=0.4)
+        self.wait_until("ninety")        # same anchors as the storyboard `on` values
+        self.play(Create(arc), run_time=0.5)
+        self.finish()                    # hold to the end of the scene's slot
+```
+
+- `wait_until(anchor)` waits until `anchor - 0.06 s` of the scene's own clock; it does nothing if
+  the animation is already past it (so a slow `run_time` never makes things drift later, it just
+  stops waiting). Anchors: `"rotates"`, `"rotates#2"`, `"w12"`, `"p2"`, `"end"`, `"s02.start"`.
+- Keep every `run_time` short (0.3 to 1 s) so the next `wait_until` has room. If an animation
+  would still be running when the next word is spoken, shorten it or use `lag_ratio`.
+- `self.finish()` makes the render exactly as long as its grid slot; `mux.sh` conforms small
+  differences and warns on big ones. Never end a scene with a fixed `self.wait(2)`.
+- Use `self.grid.cue("p2")` for the raw seconds, e.g. to size a `run_time` that must end on the
+  next phrase: `run_time=self.grid.cue("p2") - self.now - 0.06`.
+- Do not attach audio in Manim (`add_sound`): `mux.sh` muxes the mastered mix over the scenes.
+- `render.sh` quality `med` is 720p30 and `high` is 1080p60; `mux.sh` resamples every scene to the
+  grid's fps, so the mix of qualities across iterations is harmless.
+- Sound effects need no code: `grid.py cues` derives them from the same beats (`audio.md`).
 
 ## Error → fix table (RITL-DOC)
 
