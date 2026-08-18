@@ -51,14 +51,13 @@ Voice selection: `ELEVENLABS_VOICE_ID`, `OPENAI_TTS_VOICE`, or `"voice"` in the 
 
 Whichever source is used, the words are then snapped onto the narration text from the
 storyboard, so a recognizer mishearing "e to the i pi" never breaks an anchor: heard words are
-matched to the written ones in order and the rest are interpolated. Check the report:
-`grid.py` prints the word source per scene. Prefer a re-run with `--no-asr` only to skip alignment
-deliberately.
+matched to the written ones in order and the rest are interpolated. `grid.py` prints the word
+source per scene; `--no-asr` skips alignment on purpose (estimates only).
 
 ## Writing narration that works
 
 - Keep it speakable: expand math and symbols ("e to the i pi equals minus one"), spell out
-  abbreviations where natural. Raw LaTeX in narration is a validator warning for a reason.
+  abbreviations where natural. Raw LaTeX in narration is read out symbol by symbol.
 - One idea per sentence: sentences become phrases (`s03.p2`) that animations can anchor to.
 - Put the word you want to anchor on early and make it distinctive.
 - Short scenes (3-12 s) are easier to keep in sync than one long scene.
