@@ -27,6 +27,10 @@ scene end. **Cap at 6 frames/scene** to bound tokens.
 - Manim: `scripts/extract_frames.sh manim <project> <id> <t1,t2,...>` → ffmpeg seeks timestamps.
 - Remotion: `scripts/extract_frames.sh remotion <project> <SceneId> <frame1,frame2,...>` →
   `remotion still` renders exact frames (cheaper than a full video).
+- Motion: first look with no video at all: `node scripts/render.mjs --project <p> --sheet [--fmt 9x16]` writes
+  a contact sheet of time-stamped frames (+ a 360 px phone sheet) and `--at 1.2,3.4` writes exact stills, because the
+  film paints any `t` directly. After a render, `scripts/extract_frames.sh motion <project> <id|all> <t1,t2,...>`
+  pulls frames from the MP4 (seconds into the scene clip, or on the whole film for `all`).
 
 Frames land in `.videogen/frames/scene_<id>_<t>.png`.
 
@@ -64,7 +68,9 @@ If `verdict == FIX`: switch to Coder hat, apply the `fix_hint`s as targeted edit
 ## 5. Global guardrails
 
 - Cumulative re-renders per run capped at **40**. If hit, deliver best-effort + report.
-- Per-scene frame budget: **≤6**.
+- Per-scene frame budget: **≤6**. (A motion contact sheet counts as one image however many frames it tiles.)
+- Motion lessons also gate on determinism: `scripts/render.sh motion <project> all verify` must report every
+  probe identical before delivery. A failure is a render-contract bug (`references/motion-rules.md`), not a critic issue.
 - If a fix would require changing the storyboard (not just code), note it and ask the user
   rather than silently diverging from the approved plan.
 
