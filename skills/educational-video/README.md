@@ -1,7 +1,7 @@
 # educational-video
 
 A Claude Code skill that generates high-quality, consistent **educational** videos by writing
-and rendering **code** (Manim or Remotion) inside an agentic render-verify loop — rather than
+and rendering **code** (Manim, Remotion or the spring-driven motion engine) inside an agentic render-verify loop — rather than
 synthesizing pixels with text-to-video models, which can't hold logical/numeric/text rigor.
 
 ## What it does
@@ -27,7 +27,7 @@ questions, then bootstrapping and producing the video in a project folder under 
 Present on this machine: `uv`, Python 3.14 (a pinned **3.12** venv is created for Manim — 3.14
 breaks Manim), Node/npm, ffmpeg, LaTeX (pdflatex+dvisvgm), cairo, pango.
 
-Installed on first run as needed: Manim (pip into the venv), Remotion (npm), TTS.
+Installed on first run as needed: Manim (pip into the venv), Remotion (npm), Playwright + Chromium (motion), TTS.
 
 **Narration quality:** with no cloud key set, narration uses local **Piper** (offline). For
 better voices, set `ELEVENLABS_API_KEY` or `OPENAI_API_KEY` before running.
@@ -37,7 +37,9 @@ better voices, set `ELEVENLABS_API_KEY` or `OPENAI_API_KEY` before running.
 ```
 SKILL.md                  # orchestration: phases, agent roles, loops, retry caps
 references/               # knowledge corpus (read on demand)
-  engine-selection.md     # Manim vs Remotion heuristics
+  engine-selection.md     # Manim vs Remotion vs motion heuristics
+  motion-engine.md        # motion engine: layout, time source, cue grid, API, commands
+  motion-rules.md         # render contract, springs and lesson rhythm for motion
   storyboard-schema.md    # storyboard.json contract
   manim-patterns.md       # Manim snippets + error→fix table
   remotion-patterns.md    # Remotion snippets + error→fix table
@@ -45,13 +47,18 @@ references/               # knowledge corpus (read on demand)
   verify-loop.md          # RITL + vision-critic rubric
   tts-setup.md            # provider detection + recipes
   troubleshooting.md      # known failure modes + fixes
+engines/motion/          # the motion engine: core.js, type.js, lib/, starter lesson
+templates/               # timeline.json starter
 scripts/                 # deterministic helpers
   bootstrap.sh            # env setup (uv venv 3.12, Manim, Remotion, TTS)
   detect_tts.py           # resolve TTS provider → JSON
   new_project.sh          # per-run scaffold + manifest/storyboard stubs
   validate_storyboard.py  # storyboard validation
-  render.sh               # unified render (manim|remotion)
+  render.sh               # unified render (manim|remotion|motion)
   extract_frames.sh       # critic frames (ffmpeg / remotion still)
+  scaffold_motion.sh      # add the motion engine (film/, timeline.json) to a project
+  sync.mjs                # timeline (+ cue grid) -> film/data.js + cues.json
+  render.mjs              # motion renderer: sheets, stills, drafts, finals, clips, --verify, --mux
   tts.py                  # per-scene narration synthesis
   align_subtitles.py      # .srt/.ass from word timings or forced alignment
   mux.sh                  # concat + audio + loudnorm + subtitles → final.mp4
