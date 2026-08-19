@@ -43,7 +43,8 @@ references/               # knowledge corpus (read on demand)
   remotion-patterns.md    # Remotion snippets + error→fix table
   component-library.md     # reusable templates (both engines)
   verify-loop.md          # RITL + vision-critic rubric
-  tts-setup.md            # provider detection + recipes
+  tts-setup.md            # provider detection + recipes + word timings
+  audio.md                # narration grid, music bed, sfx, mix, mux
   troubleshooting.md      # known failure modes + fixes
 scripts/                 # deterministic helpers
   bootstrap.sh            # env setup (uv venv 3.12, Manim, Remotion, TTS)
@@ -52,9 +53,15 @@ scripts/                 # deterministic helpers
   validate_storyboard.py  # storyboard validation
   render.sh               # unified render (manim|remotion)
   extract_frames.sh       # critic frames (ffmpeg / remotion still)
-  tts.py                  # per-scene narration synthesis
-  align_subtitles.py      # .srt/.ass from word timings or forced alignment
-  mux.sh                  # concat + audio + loudnorm + subtitles → final.mp4
+  tts.py                  # per-scene narration synthesis (cached)
+  grid.py                 # narration grid: word times, scene slots, named cues, sfx plan
+  align_subtitles.py      # .srt/.ass from the grid
+  music.py                # quiet music bed (calm | curious | upbeat)
+  sfx.mjs                 # sound effects on cues
+  mix.py                  # narration + bed + sfx, ducked, -14 LUFS / -1 dBTP
+  mux.sh                  # conform scenes to the grid, mux the mix + subtitles → final.mp4
+templates/
+  gridsync.py / .ts       # read grid cues from Manim / Remotion scenes
 ```
 
 ## Per-run output
