@@ -43,6 +43,24 @@
 - **Subtitles not showing** → soft-muxed `.srt` needs a player with subtitles on; use the burned
   `.ass` path (`-vf subtitles=...`) if you need them always visible.
 
+## Motion engine
+
+- **`playwright not found`** → `scripts/bootstrap.sh <project> motion` (or `npm i -D playwright && npx playwright install chromium`
+  inside the project); `render.mjs` resolves Playwright from the project folder.
+- **Chromium does not start** → on a minimal Linux box install its shared libraries (`npx playwright install-deps chromium`).
+- **`the film failed to load`** → the message is the page error. `unknown mark or cue "x"` means a typo in `film.js` or
+  `timeline.json`, or a cue that `grid.json` does not define; fix the name and re-run `sync.mjs`.
+- **`NOT DETERMINISTIC at t=...`** (`--verify`) → state leaks between frames: a CSS transition, `setTimeout`, `will-change`,
+  CSS 3D, `Math.random`, or a variable mutated in `run()`. See `motion-rules.md`.
+- **`Unable to capture screenshot`** → occasional headless Chromium refusal; `render.mjs` retries each capture four times.
+  If it persists, close other heavy browsers and re-run.
+- **`font not loaded`** in the `[page]` log → the face named in `C.fonts` has no `@font-face` in `film/index.html`; the system
+  stack is used meanwhile.
+- **Stale engine copy** → a project keeps the engine files it was scaffolded with; `scripts/scaffold_motion.sh <project> --update`
+  refreshes them without touching `film.js`, `timeline.json` or `data.js`.
+- **Renders are slow** → finals do adaptive motion blur (2-24 screenshots per frame). Iterate with `low` (30 fps, no blur)
+  or contact sheets, render `high` once.
+
 ## TTS
 
 - **No cloud key** → Piper is used; if Piper binary/model download failed, bootstrap falls back
