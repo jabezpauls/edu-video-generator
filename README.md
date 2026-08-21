@@ -1,7 +1,7 @@
 # Educational Video Generator
 
 > A **Claude Code skill** that turns any topic into a narrated, subtitled **educational video** —
-> using **code-driven animation** (Manim + Remotion) inside an agentic *render → verify → fix*
+> using **code-driven animation** (Manim, Remotion + the motion engine) inside an agentic *render → verify → fix*
 > loop. Built for math, physics, CS, and algorithm explainers where correctness matters.
 
 Keywords: educational video generation · AI video generator · Manim · Remotion · Claude Code
@@ -23,15 +23,16 @@ Ask in plain language → the skill produces a finished `final.mp4`:
 
 ```
 topic / script
-   └─► engine selection (Manim vs Remotion)
+   └─► engine selection (Manim, Remotion or motion)
         └─► storyboard.json
              └─► per-scene code  ──► render ──► RITL error loop + vision critic
                                                       └─► TTS voiceover ──► word-aligned subtitles
                                                                               └─► muxed final.mp4
 ```
 
-- **Two co-equal engines:** Manim (Python — math/geometry/algorithms) and Remotion (React/TSX —
-  UI/text/data/branded explainers), auto-selected per topic.
+- **Three co-equal engines:** Manim (Python — math/geometry), Remotion (React/TSX —
+  UI/text/data/branded explainers) and **motion** (a spring-driven `seek(t)` engine in HTML/JS —
+  concept explainers, algorithm stepping, kinetic type, multi-format), auto-selected per topic.
 - **Full pipeline:** visuals + voiceover + subtitles, muxed and loudness-normalized.
 - **Self-correcting:** deterministic error retries + a vision critic that catches overlap,
   off-screen, illegible text, and bad timing.
