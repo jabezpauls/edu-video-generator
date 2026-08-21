@@ -45,10 +45,11 @@ references/               # knowledge corpus (read on demand)
   verify-loop.md          # RITL + vision-critic rubric
   formats.md              # 16x9 / 1x1 / 4x5 / 9x16, safe areas, re-blocking
   presets.md              # looks: file format, how Manim and Remotion use them
-  tts-setup.md            # provider detection + recipes
+  tts-setup.md            # provider detection + recipes + word timings
+  audio.md                # narration grid, music bed, sfx, mix, mux
   troubleshooting.md      # known failure modes + fixes
 presets/                 # blank (documented), chalkboard, paper, blueprint + OFL fonts
-templates/               # helpers copied into projects: springs + formats for Manim and Remotion
+templates/               # helpers copied into projects: springs, formats, gridsync for Manim and Remotion
 scripts/                 # deterministic helpers
   bootstrap.sh            # env setup (uv venv 3.12, Manim, Remotion, TTS)
   detect_tts.py           # resolve TTS provider → JSON
@@ -59,9 +60,13 @@ scripts/                 # deterministic helpers
   apply_preset.py         # preset -> fonts, scenes/theme.py, scenes/src/theme.ts
   extract_frames.sh       # critic frames (ffmpeg / remotion still / any mp4)
   review.py               # scored-critic kit from rendered mp4s (sheets + metrics.json)
-  tts.py                  # per-scene narration synthesis
-  align_subtitles.py      # .srt/.ass from word timings or forced alignment
-  mux.sh                  # concat + audio + loudnorm + subtitles → final.mp4
+  tts.py                  # per-scene narration synthesis (cached)
+  grid.py                 # narration grid: word times, scene slots, named cues, sfx plan
+  align_subtitles.py      # .srt/.ass from the grid
+  music.py                # quiet music bed (calm | curious | upbeat)
+  sfx.mjs                 # sound effects on cues
+  mix.py                  # narration + bed + sfx, ducked, -14 LUFS / -1 dBTP
+  mux.sh                  # conform scenes to the grid, mux the mix + subtitles → final.mp4
 ```
 
 ## Per-run output

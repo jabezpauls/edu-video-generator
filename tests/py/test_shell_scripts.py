@@ -44,6 +44,10 @@ def test_extract_frames_rejects_unknown_engine(tmp_path):
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 def test_mux_without_scene_videos_reports_missing(quirky_project):
+    # mux works from the narration grid, which defines every scene's slot
+    (quirky_project / "grid.json").write_text(json.dumps({
+        "fps": 30, "duration": 20,
+        "scenes": [{"id": "01", "duration": 10}, {"id": "02", "duration": 10}]}))
     r = subprocess.run(
         ["bash", str(SCRIPTS / "mux.sh"), str(quirky_project)],
         capture_output=True, text=True, check=False,

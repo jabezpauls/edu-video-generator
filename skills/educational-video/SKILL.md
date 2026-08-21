@@ -70,6 +70,7 @@ the user asked for them; the defaults are a 16x9 lesson. Validate with `scripts/
 durations must be within **±15%** of target.
 
 ### Phase 4 — Generate code (Coder)
+With narration on, do Phase 7 first so scene lengths and `on` anchors come from `grid.json`.
 For each scene, FIRST read the matching patterns + component templates
 (`references/component-library.md`), THEN write code. Prefer instantiating templates
 (TitleCard, BulletList, EquationReveal, CodeBlock, DataChart, LowerThird, SceneTransition) over
@@ -102,20 +103,27 @@ Apply `references/verify-loop.md`:
    round set `critic_rounds`, `scores` (latest round) and `critic_mode` in the manifest, fix the
    3 worst problems, re-render and repeat. Details: `references/verify-loop.md` §6.
 
-### Phase 7 — Narration / TTS
-If narration is on, run `scripts/tts.py <project>` to synthesize per-scene audio from each
-scene's `narration` text using the provider resolved in Phase 1 (cloud if a key is set, else
-local Piper). Output `audio/scene_<id>.wav` + `audio/scene_<id>.words.json` (word timestamps
-where the provider supports them). See `references/tts-setup.md`.
+### Phase 7 — Narration / TTS → narration grid
+Narration is the clock. If narration is on, run it as soon as the storyboard is approved (before
+coding scenes) and re-run after any script change:
+`scripts/tts.py <project>` (per-scene audio from each scene's `narration`; cloud provider if a key
+is set, else local Piper), then `scripts/grid.py <project> --write-durations` (word times, scene
+slots from real speech, named cues in `grid.json`) and `scripts/grid.py resolve <project>`
+(beat `on` anchors → times). Scenes read the grid with `templates/gridsync.py` (Manim) or
+`templates/gridsync.ts` (Remotion), so animations land on their words and scenes are exactly as
+long as their speech. See `references/tts-setup.md` and `references/audio.md`.
 
-### Phase 8 — Subtitle alignment
-Run `scripts/align_subtitles.py <project>`: use provider word-timings directly, else force-align
-(faster-whisper, installed lazily). Output `output/subtitles.srt` + styled `output/subtitles.ass`.
+### Phase 8 — Subtitles and sound
+`scripts/align_subtitles.py <project>` → `output/subtitles.srt` + `.ass` from the grid.
+Then `scripts/grid.py cues <project>` and `node scripts/sfx.mjs <project>` (sound effects on
+cues), `scripts/music.py <project> --mood curious|calm|upbeat|none` (bed), and
+`scripts/mix.py <project>` (ducked, mastered to -14 LUFS, TP ≤ -1 dBTP → `audio/mix.wav`).
 
 ### Phase 9 — Mux
-Run `scripts/mux.sh <project>`: concat scene videos, attach narration, normalize loudness
-(`loudnorm`), soft-mux subtitles → `output/final.mp4`. If a scene's animation is shorter than
-its narration, extend that scene's duration in code and re-render (≤2 reconciliation passes).
+Run `scripts/mux.sh <project>`: conform each scene video to its grid slot, concat, attach
+`audio/mix.wav` (remixing first if stale), soft-mux subtitles → `output/final.mp4`. If it warns
+that a scene render is shorter or longer than its slot, fix the scene's timing and re-render
+instead of relying on the hold/trim.
 
 ### Phase 10 — Deliver
 Report the path to `output/final.mp4`, total duration, engine used, per-scene retry counts, and
@@ -148,5 +156,6 @@ unresolved critic warnings.
 - `references/presets.md` — looks (chalkboard, paper, blueprint, blank): file format and how engines use it.
 - `references/verify-loop.md` — RITL + vision-critic rubric, frame sampling, retry caps, scored critic rounds.
 - `references/critique.md` — prompt for the fresh critic: 8 criteria, caps, failure modes, log format.
-- `references/tts-setup.md` — provider detection, recipes, alignment fallback.
+- `references/tts-setup.md` — provider detection, recipes, word timings.
+- `references/audio.md` — narration grid, cues, music bed, sfx, mix, mux.
 - `references/troubleshooting.md` — Python 3.14/Manim, LaTeX, cairo/pango, ffmpeg, Chrome shell.

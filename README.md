@@ -32,7 +32,8 @@ topic / script
 
 - **Two co-equal engines:** Manim (Python — math/geometry/algorithms) and Remotion (React/TSX —
   UI/text/data/branded explainers), auto-selected per topic.
-- **Full pipeline:** visuals + voiceover + subtitles, muxed and loudness-normalized.
+- **Full pipeline:** visuals + voiceover + subtitles + a quiet music bed and sound effects,
+  all on one word-level narration grid, mastered to -14 LUFS and muxed.
 - **Self-correcting:** deterministic error retries + a vision critic that catches overlap,
   off-screen, illegible text, and bad timing.
 - **Per-run TTS:** uses ElevenLabs/OpenAI if a key is set, else local **Piper** (offline).
@@ -85,8 +86,8 @@ educational-video-generator/
     └── educational-video/
         ├── SKILL.md          # orchestration: phases, agent roles, loops, retry caps
         ├── README.md         # skill-specific docs
-        ├── references/       # knowledge corpus (engine selection, schemas, patterns, verify loop, TTS, troubleshooting)
-        └── scripts/          # bootstrap, render, frame-extract, TTS, subtitle align, mux
+        ├── references/       # knowledge corpus (engine selection, schemas, patterns, verify loop, TTS, audio, troubleshooting)
+        └── scripts/          # bootstrap, render, frame-extract, TTS, narration grid, music, sfx, mix, subtitle align, mux
 ```
 
 ## Development

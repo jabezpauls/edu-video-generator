@@ -41,3 +41,21 @@ def test_group_lines_splits_every_seven_words(sub):
 
 def test_group_lines_empty(sub):
     assert sub.group_lines([]) == []
+
+
+def test_group_lines_breaks_at_sentence_ends(sub):
+    words = [{"word": w, "start": i, "end": i + 0.5}
+             for i, w in enumerate("One two three. Four five".split())]
+    assert [ln["text"] for ln in sub.group_lines(words)] == ["One two three.", "Four five"]
+
+
+def test_main_uses_grid_clock(sub, tmp_path, monkeypatch):
+    import json
+    words = [{"i": 0, "word": "Hello", "start": 2.0, "end": 2.4},
+             {"i": 1, "word": "world.", "start": 2.5, "end": 3.0}]
+    (tmp_path / "storyboard.json").write_text(json.dumps({"scenes": [{"id": "01"}]}))
+    (tmp_path / "grid.json").write_text(json.dumps({"scenes": [{"id": "01", "words": words}]}))
+    monkeypatch.setattr("sys.argv", ["align_subtitles.py", str(tmp_path)])
+    assert sub.main() == 0
+    srt = (tmp_path / "output" / "subtitles.srt").read_text()
+    assert "00:00:02,000 --> 00:00:03,000" in srt and "Hello world." in srt

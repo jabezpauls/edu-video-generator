@@ -35,3 +35,19 @@ def test_local_engines_found_on_path(tmp_path, exe, provider):
     bin_.write_text("#!/bin/sh\n")
     bin_.chmod(0o755)
     assert detect({}, tmp_path)["provider"] == provider
+
+
+def test_piper_in_project_venv_is_found(tmp_path):
+    bin_ = tmp_path / ".venv" / "bin" / "piper"
+    bin_.parent.mkdir(parents=True)
+    bin_.write_text("#!/bin/sh\n")
+    bin_.chmod(0o755)
+    d = detect({}, tmp_path)
+    assert d["provider"] == "piper" and d["bin"] == str(bin_)
+
+
+def test_piper_voice_can_be_chosen(tmp_path):
+    bin_ = tmp_path / "piper"
+    bin_.write_text("#!/bin/sh\n")
+    bin_.chmod(0o755)
+    assert detect({"PIPER_VOICE": "en_GB-alan-medium"}, tmp_path)["model"] == "en_GB-alan-medium"

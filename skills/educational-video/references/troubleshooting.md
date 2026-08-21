@@ -38,8 +38,12 @@
 - **Concat fails / glitches at joins** → use the concat *demuxer* with a file list and ensure all
   scenes share codec/fps/resolution (they do if rendered with the same settings). `mux.sh`
   re-encodes if params differ.
-- **Audio/video out of sync** → ensure each scene's video duration ≥ its audio; the Phase-9
-  reconciliation extends short scenes. Use `-af loudnorm` for consistent volume.
+- **Audio/video out of sync** → scene videos must match their slot in `grid.json`. `mux.sh`
+  holds the last frame of a short render and trims a long one, and warns when the gap is large:
+  end Manim scenes with `self.finish()`, size Remotion compositions with `sceneFrames(id)`.
+  After changing narration, re-run `tts.py`, `grid.py` and re-render; the grid is the clock.
+- **Loudness off target** → never use `loudnorm` per scene; `mix.py` masters the whole mix to
+  -14 LUFS / -1 dBTP once (`audio.md`). A `WARNING: off target` means lower the loudest stem.
 - **Subtitles not showing** → soft-muxed `.srt` needs a player with subtitles on; use the burned
   `.ass` path (`-vf subtitles=...`) if you need them always visible.
 
@@ -47,7 +51,14 @@
 
 - **No cloud key** → Piper is used; if Piper binary/model download failed, bootstrap falls back
   to `espeak-ng`. Set `ELEVENLABS_API_KEY`/`OPENAI_API_KEY` for better voices.
-- **No word timestamps** → Phase 8 installs `faster-whisper` and force-aligns.
+- **No word timestamps** → `grid.py` force-aligns with `faster-whisper` (installed by bootstrap
+  with Piper, or lazily). If it fails it prints a warning and estimates word times from text
+  length: anchors still resolve but land less precisely. Fix the install and re-run `grid.py`.
+- **`TypeError ... metadata_errors` from faster-whisper** → an old PyAV; `grid.py` decodes audio
+  with ffmpeg itself, so make sure it is the current script.
+- **`anchor ... says "x" 0 time(s)` / "not in scene"** → the beat's `on` word is not in that scene's
+  narration (or the narration changed); fix the word or use `wN` / `pN`. List cues with
+  `python3 -c "import json;print(*json.load(open('grid.json'))['cues'])"`.
 
 ## General
 

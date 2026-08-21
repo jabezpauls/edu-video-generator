@@ -106,7 +106,7 @@ fades for primary elements: pair them with a spring move.
 | Math | KaTeX via `@remotion/google-fonts` + a KaTeX component, or render to SVG |
 | Code highlighting | `@remotion/shiki` or prism; show as styled `<pre>` |
 | Charts | Recharts/D3 inside the component |
-| Audio | `<Audio src={staticFile("...")} />` |
+| Audio | none in scenes: `mux.sh` adds the mastered mix (`audio.md`) |
 
 ## Map storyboard beats
 
@@ -115,11 +115,41 @@ element in `<Sequence from={Math.round(t*fps)}>`. Actions: `fade_in→interpolat
 `slide_in→interpolate translateX`, `pop_in→spring scale`, `write→stagger children opacity`,
 `highlight→interpolate a glow/scale pulse`.
 
-## Duration
+## Duration and word sync (read the grid)
 
-A scene's length = its `<Composition durationInFrames>`. To match narration, set
-`durationInFrames = round(est_duration_s * fps)`; Phase-9 reconciliation bumps this if audio is
-longer.
+A scene's length is its grid slot, and its beats are the grid's word times (see `audio.md`).
+Copy `templates/gridsync.ts` to `scenes/src/gridsync.ts`:
+
+```tsx
+import { AbsoluteFill, interpolate, Easing } from "remotion";
+import { useGrid, sceneFrames, gridData } from "./gridsync";
+
+const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) } as const;
+
+export const Scene01: React.FC = () => {
+  const g = useGrid("01");                                   // storyboard scene id
+  const dot = interpolate(g.since("rotates"), [0, 0.4], [0, 1], clamp);   // 0 -> 1 as the word is said
+  const arc = interpolate(g.since("ninety"), [0, 0.5], [0, 1], clamp);
+  return <AbsoluteFill>{/* ... drive opacity / position from dot and arc ... */}</AbsoluteFill>;
+};
+
+// Root.tsx: the composition is exactly as long as its slot
+<Composition id="Scene01" component={Scene01} durationInFrames={sceneFrames("01")}
+             fps={gridData.fps} width={1920} height={1080} />
+```
+
+- `g.since(anchor)` is seconds since the anchored word, shifted 0.06 s early so the visual reads
+  on the word; it is negative before that, so `interpolate` with clamping holds the start state.
+  `g.passed(anchor)` is the boolean form, `g.at(anchor)` the scene-local time in seconds.
+- Anchors match the storyboard `on` values: `"rotates"`, `"rotates#2"`, `"w12"`, `"p2"`, `"end"`,
+  `"s02.start"`. A missing anchor throws, naming the cue it looked for.
+- `grid.json` is imported from the project root (`../../grid.json` from `scenes/src`), so re-run
+  `grid.py` and re-render after changing narration; the render is deterministic from the grid.
+- Do not add `<Audio>`: `mux.sh` muxes the mastered mix over the scenes, which is what keeps
+  loudness at -14 LUFS. Sound effects come from `grid.py cues`, not from code.
+- Prefer `interpolate` and closed-form easing keyed on `g.since(...)` over `spring()` for
+  anything that must land on a word: a physics spring's settle time varies with its config, a
+  clamped interpolation reaches its end exactly when you say.
 
 ## Safe area & legibility
 

@@ -1,45 +1,19 @@
 #!/usr/bin/env python3
-"""Build subtitles from per-scene word timestamps, or via forced alignment.
+"""Build subtitles from the narration grid.
 
-For each scene: prefer audio/scene_<id>.words.json (provider timings). If absent,
-run faster-whisper on audio/scene_<id>.wav (installed lazily) to get word timings.
-Scene start offsets accumulate from each scene's audio duration. Emits:
+Uses <project>/grid.json (run grid.py first) so captions sit on exactly the same clock as the
+picture and the mix. Without a grid, falls back to per-scene word timings
+(audio/scene_<id>.words.json, else forced alignment) and cumulative audio lengths. Emits:
   output/subtitles.srt  and  output/subtitles.ass (styled)
 
 Usage: align_subtitles.py <project-dir>
 """
 import json
 import os
-import subprocess
 import sys
 
-
-def audio_duration(path):
-    try:
-        out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=nw=1:nk=1", path],
-            capture_output=True, text=True, check=True).stdout.strip()
-        return float(out)
-    except Exception:  # noqa: BLE001
-        return 0.0
-
-
-def whisper_words(wav):
-    """Force-align via faster-whisper; install on demand."""
-    try:
-        from faster_whisper import WhisperModel
-    except ImportError:
-        subprocess.run([sys.executable, "-m", "pip", "install", "faster-whisper"],
-                       check=True)
-        from faster_whisper import WhisperModel
-    model = WhisperModel("base", device="cpu", compute_type="int8")
-    segments, _ = model.transcribe(wav, word_timestamps=True)
-    words = []
-    for seg in segments:
-        for w in (seg.words or []):
-            words.append({"word": w.word.strip(), "start": w.start, "end": w.end})
-    return words
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wordtimes as wt  # noqa: E402
 
 
 def fmt_srt(t):
@@ -64,7 +38,7 @@ def group_lines(words, max_words=7):
     cur = []
     for w in words:
         cur.append(w)
-        if len(cur) >= max_words:
+        if len(cur) >= max_words or (len(cur) >= 3 and wt.ends_sentence(w["word"])):
             lines.append(cur); cur = []
     if cur:
         lines.append(cur)
@@ -92,22 +66,24 @@ def main():
     audio_dir = os.path.join(project, "audio")
     out_dir = os.path.join(project, "output"); os.makedirs(out_dir, exist_ok=True)
 
+    grid_path = os.path.join(project, "grid.json")
     all_lines = []
-    offset = 0.0
-    for sc in sb["scenes"]:
-        sid = sc["id"]
-        wav = os.path.join(audio_dir, f"scene_{sid}.wav")
-        wjson = os.path.join(audio_dir, f"scene_{sid}.words.json")
-        if not os.path.isfile(wav):
-            continue
-        if os.path.isfile(wjson):
-            words = json.load(open(wjson))
-        else:
-            words = whisper_words(wav)
-        for w in words:
-            w["start"] += offset; w["end"] += offset
-        all_lines.extend(group_lines(words))
-        offset += audio_duration(wav)
+    if os.path.isfile(grid_path):
+        grid = json.load(open(grid_path))
+        for sc in grid["scenes"]:
+            all_lines.extend(group_lines(sc["words"]))
+    else:
+        offset = 0.0
+        for sc in sb["scenes"]:
+            sid = sc["id"]
+            wav = os.path.join(audio_dir, f"scene_{sid}.wav")
+            if not os.path.isfile(wav):
+                continue
+            words, _, dur = wt.scene_words(project, sid, sc.get("narration", ""))
+            for w in words:
+                w["start"] += offset; w["end"] += offset
+            all_lines.extend(group_lines(words))
+            offset += dur
 
     # SRT
     srt = os.path.join(out_dir, "subtitles.srt")
