@@ -95,6 +95,8 @@ render_motion() {
       --out "$abs/output/scene_${scene}.mp4" "${flags[@]}" >>"$log" 2>&1 || rc=$?
     [[ $rc -eq 0 ]] && echo "-> $OUT/scene_${scene}.mp4" | tee -a "$log"
   fi
+  # verify and sheet report through the log: show what they found
+  [[ "$Q" == "verify" || "$Q" == "sheet" ]] && grep -v '^>>' "$log"
   if [[ $rc -ne 0 ]]; then echo "motion render failed (see $log):" >&2; tail -n 8 "$log" >&2; fi
   return $rc
 }
