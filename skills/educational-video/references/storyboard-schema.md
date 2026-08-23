@@ -94,6 +94,13 @@ is optional, so storyboards written against the original schema keep validating 
 Words may contain letters, digits, `'` and `-`. A qualified cue must name a scene that exists
 (error) and should normally be the beat's own scene (warning otherwise).
 
+### Engine mapping
+
+The same storyboard drives every engine. For `motion`, scene `"02"` becomes the film scene `s02` in `film/film.js`; a
+beat's `t` (seconds from scene start) becomes a mark in `timeline.json` (`"s02.start+3"`), and an `on` anchor becomes the
+cue of the same name (`"s02.rotates"`) once narration exists. Before narration, `sync.mjs` derives `sNN.start` and
+`sNN.end` from each scene's `est_duration_s`. See `motion-engine.md`.
+
 ## Rules
 
 - Scene `id`s are unique and define order. Sum of `est_duration_s` must be within ±15% of

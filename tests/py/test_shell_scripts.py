@@ -81,3 +81,28 @@ def test_extract_frames_video_mode_grabs_a_still(tmp_path):
     )
     assert r.returncode == 0
     assert (tmp_path / ".videogen" / "frames" / "r1_0.5.png").is_file()
+
+
+def test_motion_render_rejects_unknown_quality(tmp_path):
+    r = subprocess.run(["bash", str(SCRIPTS / "render.sh"), "motion", str(tmp_path), "all", "ultra"],
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 2
+    assert "unknown quality for motion" in r.stderr
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_motion_render_needs_a_motion_project(tmp_path):
+    r = subprocess.run(["bash", str(SCRIPTS / "render.sh"), "motion", str(tmp_path), "all", "low"],
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 1
+    assert "timeline.json not found" in r.stderr
+
+
+def test_extract_frames_motion_reports_missing_video(tmp_path):
+    for target in ("all", "02"):
+        r = subprocess.run(
+            ["bash", str(SCRIPTS / "extract_frames.sh"), "motion", str(tmp_path), target, "1"],
+            capture_output=True, text=True, check=False,
+        )
+        assert r.returncode == 1, target
+        assert "no video" in r.stderr or "no render" in r.stderr

@@ -163,6 +163,23 @@ def test_cli_build_resolve_and_cue(tmp_path):
     assert run("cue", str(tmp_path), "s01.zebra").returncode == 1
 
 
+def test_cli_cues_does_not_clobber_a_motion_timeline_plan(tmp_path):
+    (tmp_path / "audio").mkdir()
+    (tmp_path / "storyboard.json").write_text(json.dumps(STORY))
+    for sid, text in (("01", STORY["scenes"][0]["narration"]), ("02", "The end of the line.")):
+        (tmp_path / "audio" / f"scene_{sid}.words.json").write_text(json.dumps(words(text)))
+    run = lambda *a: subprocess.run([sys.executable, str(SCRIPTS / "grid.py"), *a],
+                                    capture_output=True, text=True)
+    assert run(str(tmp_path), "--no-asr").returncode == 0
+    mine = {"sr": 48000, "duration": 9, "source": "timeline", "cues": [{"t": 1, "type": "pop"}]}
+    (tmp_path / "cues.json").write_text(json.dumps(mine))
+    r = run("cues", str(tmp_path))
+    assert r.returncode == 1 and "--force" in r.stderr
+    assert json.loads((tmp_path / "cues.json").read_text()) == mine
+    assert run("cues", str(tmp_path), "--force").returncode == 0
+    assert json.loads((tmp_path / "cues.json").read_text())["source"] == "grid"
+
+
 # ---- sfx plan ----
 
 def plan(grid, story=STORY, **kw):

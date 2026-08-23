@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>lesson</title>
+<style>
+  /* One display face, one body face. With no font files the system stack is used (fine for drafts). To ship a look,
+     drop .woff2 files in assets/fonts/ and uncomment these, then list them in C.fonts in film.js so frame 0 waits for them.
+  @font-face { font-family: 'Display'; src: url(../assets/fonts/display.woff2) format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'UI'; src: url(../assets/fonts/ui.woff2) format('woff2'); font-weight: 100 900; }
+  */
+  :root {
+    /* look tokens: ONE accent, plus ONE highlight hue reserved for emphasis inside derivations / code / diagrams */
+    --bg: #f6f5f1; --ink: #121212; --ink-2: #55534e; --accent: #e8552b; --hi: #1f6fb2; --card: #ffffff;
+    --font-display: 'Display', 'Helvetica Neue', Arial, sans-serif;
+    --font-ui: 'UI', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; overflow: hidden; background: var(--bg); transform-origin: 0 0;
+           font-family: var(--font-ui); color: var(--ink);
+           -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+  .scene { position: absolute; inset: 0; overflow: hidden; }
+  .abs { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.04em;
+             line-height: 0.95; white-space: nowrap; }
+  .mono { font-family: var(--font-mono); }
+  /* a line is a mask: words rise through it. Padding keeps descenders; start words >= 140% below so no sliver shows. */
+  .line { position: absolute; overflow: hidden; padding: 0.08em 0.04em 0.18em; margin: -0.08em -0.04em 0; white-space: nowrap; }
+  .word { display: inline-block; }
+  .card { position: absolute; background: var(--card); border-radius: 28px;
+          box-shadow: 0 2px 6px rgba(0,0,0,.05), 0 30px 80px -20px rgba(0,0,0,.22); }
+  body.play { display: block; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="lib/motion.js"></script>
+<script src="lib/time.js"></script>
+<script src="data.js"></script>
+<script src="core.js"></script>
+<script src="type.js"></script>
+<script src="film.js"></script>
+</body>
+</html>

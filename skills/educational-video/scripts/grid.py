@@ -336,6 +336,16 @@ def cmd_cues(a):
         print(f"unresolved anchors:\n{e}", file=sys.stderr)
         return 1
     data = sfx_cues(sb, grid, res)
+    prev = os.path.join(a.project, "cues.json")
+    if not a.force and os.path.isfile(prev):
+        try:
+            owner = json.load(open(prev)).get("source")
+        except (OSError, ValueError, AttributeError):
+            owner = None
+        if owner == "timeline":
+            print("cues.json was written by the motion engine's sync from timeline.json sfx; "
+                  "re-run with --force to replace it with the beat-derived plan", file=sys.stderr)
+            return 1
     path = _dump(a.project, "cues.json", data)
     print(f"-> {path}  {len(data['cues'])} sfx cues")
     return 0
@@ -366,6 +376,8 @@ def main(argv=None):
     c.set_defaults(fn=cmd_cue)
     s = sub.add_parser("cues")
     s.add_argument("project")
+    s.add_argument("--force", action="store_true",
+                   help="overwrite a cues.json written by the motion engine's sync")
     s.set_defaults(fn=cmd_cues)
     a = ap.parse_args(argv)
     return a.fn(a)

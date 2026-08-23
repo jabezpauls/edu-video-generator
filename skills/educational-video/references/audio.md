@@ -81,7 +81,10 @@ Sound effects sit exactly on the cue.
 ```json
 { "sr": 48000, "duration": 14.02, "cues": [{ "t": 1.78, "type": "pop", "gain": 0.7, "pitch": 1.0, "pan": -0.1, "what": "pop_in dot" }] }
 ```
-This file is the interface to `sfx.mjs`; any engine's sync step can write the same shape.
+This file is the interface to `sfx.mjs`; any engine's sync step can write the same shape. The motion
+engine's `sync.mjs` writes it too (`"source": "timeline"`, from the sfx in `timeline.json`); `grid.py cues`
+writes `"source": "grid"`. Neither silently replaces the other: `sync.mjs` keeps a grid plan unless the
+timeline declares sfx, and `grid.py cues` needs `--force` to replace a timeline plan.
 
 | Beat action | Sound | Notes |
 |---|---|---|
