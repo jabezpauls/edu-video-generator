@@ -113,11 +113,23 @@ async function openFilm(fmt) {
   if (!ready || errors.length) { console.error(`render: the film failed to load (${fmt}):\n  ${errors.join('\n  ') || 'READY never resolved'}`); await quit(1); }
   const cdp = await page.context().newCDPSession(page);
   const info = await page.evaluate(() => ({ DUR: window.DURATION, FPS: window.FPS, CUTS: window.CUTS || [], MARKS: window.MARKS || {}, SCENES: window.SCENE_TIMES || [] }));
-  // headless Chromium now and then refuses one capture ("Unable to capture screenshot"): retry before giving up
+  // Headless Chromium now and then refuses a capture ("Unable to capture screenshot") or never answers it: every capture
+  // has a deadline, and a retry goes through Playwright's own screenshot, which re-activates the page first.
+  const timed = (promise, ms, what) => new Promise((resolve, reject) => {
+    const to = setTimeout(() => reject(new Error(`${what} timed out after ${ms / 1000}s`)), ms);
+    promise.then((v) => { clearTimeout(to); resolve(v); }, (e) => { clearTimeout(to); reject(e); });
+  });
   const shot = async () => {
     for (let attempt = 1; ; attempt++) {
-      try { return Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true })).data, 'base64'); }
-      catch (e) { if (attempt >= 4) throw e; await page.bringToFront(); await new Promise((r) => setTimeout(r, 100 * attempt)); }
+      try {
+        if (attempt === 1) return Buffer.from((await timed(cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true }), 15000, 'screenshot')).data, 'base64');
+        await page.bringToFront();
+        return await page.screenshot({ type: 'png', timeout: 30000 });
+      } catch (e) {
+        if (attempt >= 4) throw e;
+        console.warn(`[render] capture retry ${attempt}: ${e.message}`);
+        await new Promise((r) => setTimeout(r, 200 * attempt));
+      }
     }
   };
   const png = async (t) => {
