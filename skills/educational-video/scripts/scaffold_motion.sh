@@ -2,7 +2,7 @@
 # Add the motion engine to a project: film/ (engine + starter lesson), timeline.json, package.json.
 # Files only, no network: bootstrap.sh installs Playwright afterwards.
 # Usage: scaffold_motion.sh <project-dir> [--update]
-#   --update  refresh the engine files (core, type, lib, index.html) and leave your film, timeline and data alone
+#   --update  refresh the engine files (core, type, lib, edu, vendor, index.html) and leave your film, timeline and data alone
 # Safe to re-run: existing film.js, timeline.json and package.json are never overwritten.
 set -euo pipefail
 
@@ -13,13 +13,18 @@ ENGINE="$SKILL/engines/motion"
 
 [[ -d "$ENGINE" ]] || { echo "motion engine not found at $ENGINE" >&2; exit 1; }
 
-mkdir -p "$PROJECT"/film/lib "$PROJECT"/renders "$PROJECT"/review "$PROJECT"/assets/fonts
+mkdir -p "$PROJECT"/film/lib "$PROJECT"/film/edu "$PROJECT"/renders "$PROJECT"/review "$PROJECT"/assets/fonts
 
 # engine files: copied (not linked) so a project keeps rendering the same after the skill is updated
 for f in index.html core.js type.js lib/motion.js lib/motion.test.js lib/time.js; do
   if [[ ! -f "$PROJECT/film/$f" || "$UPDATE" == "--update" ]]; then
     cp "$ENGINE/$f" "$PROJECT/film/$f"
   fi
+done
+# lesson components and the vendored KaTeX: whole folders, new files added on every run, existing ones kept unless --update
+for d in edu vendor; do
+  if [[ "$UPDATE" == "--update" ]]; then cp -R "$ENGINE/$d/." "$PROJECT/film/$d/" 2>/dev/null || { mkdir -p "$PROJECT/film/$d"; cp -R "$ENGINE/$d/." "$PROJECT/film/$d/"; }
+  else mkdir -p "$PROJECT/film/$d"; cp -Rn "$ENGINE/$d/." "$PROJECT/film/$d/"; fi
 done
 # the film itself starts as the starter lesson and is yours from then on
 [[ -f "$PROJECT/film/film.js" ]] || cp "$ENGINE/starter/lesson.js" "$PROJECT/film/film.js"
