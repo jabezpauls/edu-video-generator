@@ -34,7 +34,7 @@
 
   /**
    * steps: [{ units, at, reveal? }] with `at` already in seconds and reveal { termId: seconds } (seconds too).
-   * opts: { stagger = 0.07, until = Infinity (when the last step leaves), exitStagger = 0.03 }
+   * opts: { stagger = 0.07, enterDelay = 0.2 (new pieces of a later step wait this long after its `at`), until = Infinity (when the last step leaves), exitStagger = 0.03 }
    * returns per step, per unit: { from, to, enter, exit }
    *   from  index of the twin in the previous step (the unit glides from there), else -1
    *   to    index of the twin in the next step, else -1
@@ -42,21 +42,22 @@
    *   exit  seconds it leaves (null when it glides on to its twin)
    */
   function plan(steps, opts = {}) {
-    const stagger = opts.stagger ?? 0.07, exitStagger = opts.exitStagger ?? 0.03, until = opts.until ?? Infinity;
+    const stagger = opts.stagger ?? 0.07, delay = opts.enterDelay ?? 0.2, exitStagger = opts.exitStagger ?? 0.03, until = opts.until ?? Infinity;
     const out = steps.map((s) => s.units.map(() => ({ from: -1, to: -1, enter: null, exit: null })));
     for (let i = 1; i < steps.length; i++) {
       const m = match(steps[i - 1].units, steps[i].units);
       m.forEach((j, k) => { if (j >= 0) { out[i][k].from = j; out[i - 1][j].to = k; } });
     }
     steps.forEach((s, i) => {
-      const at = s.at, reveal = s.reveal || {};
+      // after a swap the new pieces wait for the old ones to leave, so the two never overlap
+      const at = s.at + (i > 0 ? delay : 0), reveal = s.reveal || {};
       let order = 0;
       const when = s.units.map((u, k) => {
         if (out[i][k].from >= 0) return null;
         if (u.kind !== 'term') return undefined;           // glue: decided from its neighbours below
         return reveal[u.id] != null ? reveal[u.id] : at + stagger * order++;
       });
-      const termTime = (k) => (out[i][k].from >= 0 ? at : when[k]);
+      const termTime = (k) => (out[i][k].from >= 0 ? s.at : when[k]);
       s.units.forEach((u, k) => {
         const o = out[i][k];
         if (o.from >= 0) return;

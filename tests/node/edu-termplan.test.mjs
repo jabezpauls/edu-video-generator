@@ -45,6 +45,6 @@ test('shared pieces glide, the rest exits when the next step starts', () => {
   assert.equal(s0[1].to, -1); assert.equal(s0[1].exit, 4);
   assert.equal(s0[2].exit, 4.05);
   assert.equal(s1[0].from, 0); assert.equal(s1[0].enter, null);
-  assert.equal(s1[1].enter, 4); assert.equal(s1[2].enter, 4);
+  assert.equal(s1[1].enter, 4.2); assert.equal(s1[2].enter, 4.2);
   assert.equal(s1[2].exit, Infinity);
 });
