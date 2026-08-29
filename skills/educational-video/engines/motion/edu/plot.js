@@ -37,12 +37,8 @@
     const ax = o.axes || {}, axAt = ax.at == null ? 0 : at(ax.at), axDur = ax.dur ?? 0.9;
     const ox = clamp(0, xr[0], xr[1]), oy = clamp(0, yr[0], yr[1]);   // axes cross at zero when it is in view
     let style = null;
-    const read = () => {
-      const cs = getComputedStyle(document.getElementById('stage'));
-      const v = (n) => cs.getPropertyValue(n).trim();
-      style = { mono: v('--font-mono') || 'monospace', col: { ink: v('--ink'), ink2: v('--ink-2'), accent: v('--accent'), hi: v('--hi'), card: v('--card'), bg: v('--bg') } };
-    };
-    const col = (n) => style.col[n] || n;
+    const read = () => { const P = E.palette(); style = { mono: P.mono }; };
+    const col = E.canvasColor;
 
     function run(t) {
       if (!style) read();

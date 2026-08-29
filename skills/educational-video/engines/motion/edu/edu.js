@@ -28,5 +28,16 @@
   /** Font size that fits `cols` monospace columns in `width` px (0.6 em per column), never above `max`. */
   const fitMono = (cols, width, max) => Math.min(max, Math.floor(width / (Math.max(1, cols) * 0.602)));
 
-  window.EDU = { tone, mix, over, draw, fitMono, TONES };
+  /** The look tokens resolved to real colours (canvas cannot read var()): { ink, ink2, accent, hi, card, bg, mono }. Read once. */
+  let PAL = null;
+  const palette = () => {
+    if (PAL) return PAL;
+    const cs = getComputedStyle(document.getElementById('stage')), v = (n) => cs.getPropertyValue(n).trim();
+    PAL = { ink: v('--ink'), ink2: v('--ink-2'), accent: v('--accent'), hi: v('--hi'), card: v('--card'), bg: v('--bg'), mono: v('--font-mono') || 'monospace' };
+    return PAL;
+  };
+  /** A look token or css colour as a colour a canvas understands. */
+  const canvasColor = (n) => palette()[n] && n !== 'mono' ? palette()[n] : n;
+
+  window.EDU = { palette, canvasColor, tone, mix, over, draw, fitMono, TONES };
 })();
