@@ -46,7 +46,7 @@
 
   /**
    * Group words into pages. opts: { maxChars: per line (28), maxLines: 2, maxWords: 8, gap: silence that closes a page (0.7 s), hold: 0.25 s a finished page stays }
-   * returns [{ from, to, words: [index...], lines: [[index...]] }]; `to` never passes the next page's `from`.
+   * returns [{ from, to, words: [index...], lines: [[index...]] }]; `to` leaves a short gap (0.2 s) before the next page's `from`, so two pages never share the screen.
    */
   function pages(words, o = {}) {
     const maxChars = o.maxChars ?? 28, maxLines = o.maxLines ?? 2, maxWords = o.maxWords ?? 8, gap = o.gap ?? 0.7, hold = o.hold ?? 0.25;
@@ -69,7 +69,7 @@
       if (line.length) lines.push(line);
       const from = words[idx[0]].t, end = words[idx[idx.length - 1]].e + hold;
       const nextFrom = out[k + 1] ? words[out[k + 1][0]].t : Infinity;
-      return { from, to: Math.min(end, nextFrom), words: idx, lines };
+      return { from, to: Math.max(from + 0.1, Math.min(end, nextFrom - 0.2)), words: idx, lines };
     });
   }
 

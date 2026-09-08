@@ -15,6 +15,8 @@
   const C = window.C, E = window.EDU, CP = window.CaptionPlan;
   const { put, reg, el, sp, spHit, pick, W, H, clamp } = C;
 
+  const QUICK = { response: 0.1, damping: 1 };      // a page leaves in about a tenth of a second
+
   function captions(parent, o = {}) {
     let list = o.words || (C.GRID && C.GRID.words) || (o.cues ? CP.fromCues(o.cues) : null);
     if (!list) throw new Error('captions: pass { words } (or { cues }); see lib/captionplan.js for the shape');
@@ -23,7 +25,7 @@
     // text zone: wide frames use most of the width; 9:16 keeps clear of the right-hand 12 % and the bottom 20 %
     const w = o.w || pick(W * 0.72, W * 0.82, W * 0.78);
     const cx = o.cx ?? pick(W / 2, W / 2, (W * 0.88) / 2 + W * 0.02);
-    const bottom = o.bottom ?? pick(H * 0.9, H * 0.88, H * 0.74);
+    const bottom = o.bottom ?? pick(H * 0.94, H * 0.9, H * 0.74);
     const maxChars = o.maxChars || Math.max(12, Math.floor(w / (size * 0.56)));
     const pages = CP.pages(words, { maxChars, maxLines: o.maxLines || pick(2, 2, 3), maxWords: o.maxWords || 8, hold: o.hold });
     const pill = (o.style || 'pill') === 'pill', activeTone = o.active || 'accent';
@@ -45,7 +47,7 @@
       built.forEach((pg, n) => {
         if (t < pg.from - 0.3 || t >= pg.to + 0.5) { put(pg.box, { o: 0 }); return; }
         if (!pg.measured) { pg.measured = true; pg.k = Math.min(1, w / (pg.box.firstElementChild.offsetWidth || w)); }
-        const inP = spHit(t, pg.from, 'default'), outP = t >= pg.to ? sp(t, pg.to, 'snappy') : 0;
+        const inP = spHit(t, pg.from, 'snappy'), outP = t >= pg.to ? sp(t, pg.to, QUICK) : 0;
         const a = clamp(inP) * (1 - clamp(outP));
         put(pg.box, { o: a > 0.001 ? a : 0, y: (1 - inP) * size * 0.7 + outP * size * 0.5, s: pg.k * (0.92 + 0.08 * inP) * (1 - 0.04 * outP) });
         for (const s of pg.spans) {
