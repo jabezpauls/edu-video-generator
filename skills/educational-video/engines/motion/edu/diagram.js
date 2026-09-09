@@ -162,7 +162,8 @@
     // rows of cells need room for the index labels and pointers that hang under each row
     const hang = (o.indices === false ? 0 : 0.5) + (o.pointers && o.pointers.length ? 0.7 + 0.5 * Math.max(0, ...o.pointers.map((p) => p.lane || 0)) : 0);
     const g = L.grid(n, { w: o.w, cell: cellK, cols: o.cols, gap: o.gap, rowGap: o.rowGap ?? (o.cols && o.cols < n ? cellK * Math.min(0.2 + hang, 1.9) : undefined) });
-    const top = o.top ?? g.cell * 0.2, left = 0;
+    const above = (o.pointers || []).some((p) => p.side === 'above');
+    const top = o.top ?? g.cell * (above ? 0.6 : 0.2), left = 0;
     const slot = g.pos.map((p) => ({ x: p.x + left, y: p.y + top }));
     const tones = o.tones || [];
     // follow the cells through the swaps: which slot does each cell sit in, and when does it move

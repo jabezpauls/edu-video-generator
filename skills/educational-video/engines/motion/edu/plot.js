@@ -137,8 +137,9 @@
         if (q.label) {
           g.fillStyle = col('ink'); g.font = `600 ${size}px ${style.mono}`; g.textAlign = q.align || 'left'; g.textBaseline = 'bottom';
           const s = q.label, wd = g.measureText(s).width;
-          const lx = q.align === 'right' ? X - size * 0.7 : Math.min(X + size * 0.7, px.r - wd);
-          g.fillText(s, lx, Y - size * 0.7);
+          const left = q.align === 'right' ? X - size * 0.7 - wd : X + size * 0.7;
+          g.textAlign = 'left';                               // a label never leaves the plot: it slides to stay inside
+          g.fillText(s, Math.max(px.l + size * 0.3, Math.min(left, px.r - wd)), Y - size * 0.7);
         }
         g.restore();
       }
