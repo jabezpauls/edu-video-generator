@@ -10,6 +10,10 @@
 //   });
 //   ...in the scene's run(t):  p.run(t);
 //
+// Data charts use the same component: `curves: [{ data: [[x, y], ...] }]` draws a polyline through given points (a line chart),
+// and `xCats: ['A', 'B']` with `bars: [{ x: 0, y: 3, label: '3' }, ...]` makes a bar chart (category i sits at x = i + 0.5, bars
+// grow from zero on springs, staggered by `stagger`). Values are the storyboard's own numbers, never rounded for looks.
+//
 // Everything is a function of t: a curve is sampled once per frame and truncated to the fraction drawn so far, the pen
 // moves at constant speed along it. `dur` is when the draw is (nearly) finished; a draw is a critically damped spring,
 // so it eases out and never has a visible end tick. Colours are look tokens (accent, hi, ink, ink2) or any css colour.
@@ -20,7 +24,8 @@
 
   function plot(parent, o = {}) {
     const W = o.w, H = o.h, size = o.size || 28;
-    const xr = o.xr || [0, 10], yr = o.yr || [0, 10];
+    const cats = o.xCats || null;
+    const xr = o.xr || (cats ? [0, cats.length] : [0, 10]), yr = o.yr || [0, 10];
     const ml = size * (o.yLabel ? 3.4 : 2.6), mb = size * 2.2, mt = size * 1.2, mr = size * 1.4;
     const px = { l: ml, t: mt, r: W - mr, b: H - mb };
     const map = { x: (v) => px.l + ((v - xr[0]) / (xr[1] - xr[0])) * (px.r - px.l), y: (v) => px.b - ((v - yr[0]) / (yr[1] - yr[0])) * (px.b - px.t) };
@@ -30,10 +35,11 @@
     const g = cv.getContext('2d');
     const curves = (o.curves || []).map((c) => {
       const a = c.from ?? xr[0], b = c.to ?? xr[1];
-      const polys = PM.toPixels(PM.sample(c.fn, a, b, Math.ceil((px.r - px.l) / 1.5), yr), map);
+      if (!c.fn && !c.data) throw new Error('plot: a curve needs fn or data');
+      const polys = PM.toPixels(c.data ? [c.data] : PM.sample(c.fn, a, b, Math.ceil((px.r - px.l) / 1.5), yr), map);
       return { ...c, polys, a, b };
     });
-    const tx = PM.ticks(xr[0], xr[1], o.xTicks || Math.max(3, Math.round((px.r - px.l) / (size * 5)))), ty = PM.ticks(yr[0], yr[1], o.yTicks || Math.max(3, Math.round((px.b - px.t) / (size * 4))));
+    const tx = cats ? { step: 1, values: cats.map((_, i) => i + 0.5) } : PM.ticks(xr[0], xr[1], o.xTicks || Math.max(3, Math.round((px.r - px.l) / (size * 5)))), ty = PM.ticks(yr[0], yr[1], o.yTicks || Math.max(3, Math.round((px.b - px.t) / (size * 4))));
     const ax = o.axes || {}, axAt = ax.at == null ? 0 : at(ax.at), axDur = ax.dur ?? 0.9;
     const ox = clamp(0, xr[0], xr[1]), oy = clamp(0, yr[0], yr[1]);   // axes cross at zero when it is in view
     let style = null;
@@ -62,7 +68,7 @@
         }
         g.globalAlpha = clamp(pa);
         g.textAlign = 'center'; g.textBaseline = 'top';
-        for (const v of tx.values) { if (v === ox && ox !== xr[0]) continue; g.fillText(PM.fmt(v, tx.step), map.x(v), px.b + size * 0.5); }
+        for (const v of tx.values) { if (v === ox && ox !== xr[0]) continue; g.fillText(cats ? cats[Math.round(v - 0.5)] : PM.fmt(v, tx.step), map.x(v), px.b + size * 0.5); }
         g.textAlign = 'right'; g.textBaseline = 'middle';
         for (const v of ty.values) { if (v === oy && oy !== yr[0]) continue; g.fillText(PM.fmt(v, ty.step), px.l - size * 0.5, map.y(v)); }
         // the axes themselves grow from the origin to the arrow ends
@@ -79,6 +85,15 @@
       }
       g.save();
       g.beginPath(); g.rect(px.l - 4, px.t - 8, px.r - px.l + 8, px.b - px.t + 16); g.clip();
+      // bars grow from the baseline
+      (o.bars || []).forEach((b, i) => {
+        const p = E.draw(t, b.at ?? axAt + 0.4 + i * (o.stagger ?? 0.12), b.dur ?? 0.7);
+        if (p < 0.001) return;
+        const bw = (b.w ?? 0.7) * ((px.r - px.l) / (xr[1] - xr[0])), x0 = map.x(b.x + (cats ? 0.5 : 0)) - bw / 2, y0 = map.y(oy), y1 = y0 + (map.y(b.y) - y0) * p;
+        g.fillStyle = col(b.color || 'accent'); g.beginPath();
+        if (g.roundRect) g.roundRect(x0, Math.min(y0, y1), bw, Math.abs(y1 - y0), [size * 0.2, size * 0.2, 0, 0]); else g.rect(x0, Math.min(y0, y1), bw, Math.abs(y1 - y0));
+        g.fill();
+      });
       // segments
       for (const s of o.segments || []) {
         const p = E.draw(t, s.at, s.dur ?? 0.6);
@@ -129,6 +144,13 @@
         }
         g.restore();
       }
+      (o.bars || []).forEach((b, i) => {
+        if (b.label == null) return;
+        const p = E.draw(t, b.at ?? axAt + 0.4 + i * (o.stagger ?? 0.12), b.dur ?? 0.7), a = clamp((p - 0.8) / 0.2);
+        if (a <= 0.001) return;
+        g.save(); g.globalAlpha = a; g.fillStyle = col('ink'); g.font = `600 ${size * 1.1}px ${style.mono}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+        g.fillText(String(b.label), map.x(b.x + (cats ? 0.5 : 0)), map.y(b.y) - size * 0.3); g.restore();
+      });
       for (const q of o.points || []) {
         const p = spHit(t, q.at, 'snappy'); if (p < 0.001) continue;
         const X = map.x(q.x), Y = map.y(q.y), r = (q.r || size * 0.4) * (0.5 + 0.5 * p);
