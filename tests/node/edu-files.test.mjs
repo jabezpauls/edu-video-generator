@@ -8,7 +8,7 @@ import { ENGINE } from './helpers/engine.mjs';
 test('the pure edu libraries load under node and expose what the components call', () => {
   const req = createRequire(import.meta.url);
   const want = { 'termplan.js': ['match', 'plan'], 'tokens.js': ['tokenize', 'html'], 'plotmath.js': ['ticks', 'sample', 'truncate'],
-    'layout.js': ['grid', 'tree', 'circle', 'exit'], 'color.js': ['parse', 'lerp'], 'captionplan.js': ['normalize', 'pages', 'activeIndex'] };
+    'layout.js': ['grid', 'tree', 'circle', 'exit'], 'zones.js': ['zone', 'content'], 'color.js': ['parse', 'lerp'], 'captionplan.js': ['normalize', 'pages', 'activeIndex'] };
   const files = readdirSync(join(ENGINE, 'edu', 'lib')).sort();
   assert.deepEqual(files, Object.keys(want).sort());
   for (const [f, names] of Object.entries(want)) {
@@ -22,6 +22,7 @@ test('index.html loads the libraries before the components that use them', () =>
   const order = [...page.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
   const at = (f) => { const i = order.indexOf(f); assert.ok(i >= 0, `${f} is loaded`); return i; };
   assert.ok(at('core.js') < at('edu/edu.js'));
+  assert.ok(at('edu/lib/zones.js') < at('edu/edu.js'));
   assert.ok(at('vendor/katex/katex.min.js') < at('edu/equation.js'));
   const uses = { 'edu/equation.js': 'termplan', 'edu/code.js': 'tokens', 'edu/plot.js': 'plotmath', 'edu/diagram.js': 'layout', 'edu/captions.js': 'captionplan' };
   for (const [comp, lib] of Object.entries(uses)) assert.ok(at(`edu/lib/${lib}.js`) < at(comp), `${lib} before ${comp}`);
