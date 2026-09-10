@@ -39,5 +39,8 @@
   /** A look token or css colour as a colour a canvas understands. */
   const canvasColor = (n) => palette()[n] && n !== 'mono' ? palette()[n] : n;
 
-  window.EDU = { palette, canvasColor, tone, mix, over, draw, fitMono, TONES };
+  /** A storyboard position word -> { x, y, w, h } for this frame (see lib/zones.js). opts: { captions: false } to use the caption strip. */
+  const zone = (position, opts) => window.Zones.zone(position, C.W, C.H, opts);
+
+  window.EDU = { zone, palette, canvasColor, tone, mix, over, draw, fitMono, TONES };
 })();

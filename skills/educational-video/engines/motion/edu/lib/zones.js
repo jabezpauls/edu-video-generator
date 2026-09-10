@@ -3,9 +3,8 @@
 //
 // The content area leaves the left/right margin the house style uses, the 9:16 platform zones (top 14 %, right 12 %,
 // bottom 20 %), and, unless opts.captions is false, the strip burned-in captions occupy. In a tall frame the side-by-side
-// positions re-block into stacked ones: left -> top half, right -> bottom half, the corners -> the quarters of those halves
-// (top-left stays top-left of the upper half, bottom-left is the lower half's, and so on), so two elements that sit
-// side by side in 16:9 stack in 9:16 instead of shrinking.
+// positions re-block into stacked ones: left and the top corners -> the upper half, right and the bottom corners -> the
+// lower half, so two elements that sit side by side in 16:9 stack in 9:16 instead of shrinking.
 (function (root, factory) {
   const Z = factory();
   if (typeof module === 'object' && module.exports) module.exports = Z;
