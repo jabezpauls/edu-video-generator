@@ -1,6 +1,6 @@
 # Component library
 
-Reusable scene templates with parallel Manim + Remotion implementations. Instantiating these
+Reusable scene templates with parallel Manim + Remotion implementations, and the motion-engine equivalents below. Instantiating these
 from `storyboard.scenes[].template` (instead of writing raw animation) is what keeps output
 consistent and minimizes critic-fix iterations. Each template encodes: safe-area margins,
 default font sizes, palette colors, and sensible enter/exit timing.
@@ -95,3 +95,64 @@ const Bullet: React.FC<{text:string}> = ({text}) => {
 - Scale text groups to ≤90% of frame width.
 - Use palette colors only, so all scenes look like one video.
 - Keep one main idea per template instance; compose multiple via the storyboard, not one mega-scene.
+
+## Motion engine
+
+For `engine: motion` the templates are the lesson components in `film/edu/` plus the type helpers (`TYPE.line`,
+`TYPE.rise`, `TYPE.type`). The full API is in `motion-components.md`; this section maps the storyboard onto it.
+
+### Element kind to component
+
+| `element.kind` | Motion component | Storyboard fields used |
+|---|---|---|
+| `equation` | `EDU.equation` | `tex` is the step's TeX; wrap the pieces the beats refer to in `\term{id}{...}`; several equations in a scene are steps |
+| `code` | `EDU.code` | `value` is `code`, `lang` is `lang`; `highlight` beats become `focus` stops |
+| `chart` (`line`, `bar`) | `EDU.plot` | `data` becomes `curves[].data` (line) or `bars` + `xCats` (bar) |
+| `axes` | `EDU.plot` | functions become `curves[].fn`; marked points become `points` / `markers` |
+| `shape` | `EDU.diagram` | `shape` and `label` become a node; arrows between shapes are `edges`; arrays and trees use `.array` / `.tree` |
+| `text` | `TYPE.line` + `TYPE.rise` | `value`; one line per beat, swapped sequentially |
+| `image` | a registered `<img>` (below) | `src` from `assets` |
+| narration | `EDU.captions` | word timings from the grid (burned in for 9:16 and shorts) |
+
+`element.position` becomes a box with `EDU.zone(position)` -> `{ x, y, w, h }`, per format: it keeps the margins, the 9:16
+platform zones and the caption strip, and stacks `left` / `right` into upper / lower halves in tall frames.
+
+Beats map to marks: `{ "t": 3, "action": "highlight", "target": "equation" }` is a mark (`"s02.start+3"`, or the `on` cue)
+passed as the `at`, `from` or `reveal` of the component. Actions: `write`/`draw` are the component's own reveal
+(equation terms, code typing, plot draws), `highlight` is `hi` / `focus` / a `hi` tone, `move` is `moves` or pointer
+stops, `transform` is an equation step, `pop_in`/`slide_in` are the component's entrance, `fade_*` is not used for primary
+elements (see `motion-rules.md`).
+
+### Template to code
+
+| Template | Motion |
+|---|---|
+| `TitleCard` | `TYPE.line` (display, accent word) + a quieter `TYPE.line` subtitle, both `rise`; hook on frame 0 |
+| `BulletList` | one `TYPE.line` per bullet, `rise` on its own cue; earlier bullets dim to ~0.3, never vanish |
+| `EquationReveal` | `EDU.equation` with `reveal` per term and a `hi` window on the term being discussed |
+| `CodeBlock` | `EDU.code` with `reveal.mode: 'type'` and `focus` stops |
+| `DataChart` | `EDU.plot` (`bars` or `curves[].data`) |
+| `Diagram` | `EDU.diagram` / `.array` / `.tree` |
+| `LowerThird` | a `TYPE.line` in the bottom-left of `EDU.zone('bottom-left')`, `rise` in and out |
+| `SceneTransition` | a hard cut at the scene boundary (`C.scene` windows); a wipe via `pre`/`post` and `C.inset` only when it means something |
+
+```js
+// EquationReveal in a scene (the starter lesson shows all of them at work)
+scene({ name: 's03', from: 's03.start', to: 's04.start',
+  build(root, S) {
+    const z = EDU.zone('center');
+    S.eq = EDU.equation(root, { x: z.x, y: z.y, w: z.w, size: C.pick(150, 120, 130),
+      steps: [{ tex: '\\term{lhs}{e^{i\\pi}} \\term{eq}{=} \\term{rhs}{-1}', at: 's03.start+0.4', reveal: { rhs: 's03.minus_one' } }],
+      hi: [{ term: 'rhs', from: 's03.minus_one', to: 's03.end-1' }] });
+  },
+  run(t, S) { S.eq.run(t); },
+});
+
+// an image (a registered element like any other)
+S.img = el('img', { src: '../assets/diagram.png', style: `position:absolute;left:${z.x}px;top:${z.y}px;width:${z.w}px` }, root);
+reg(S.img, { o: 0 });   // run(t): const p = spHit(t, 's03.start+1', 'default'); put(S.img, { o: p > 0.001 ? 1 : 0, y: (1 - p) * 40, s: 0.94 + 0.06 * p });
+```
+
+Authoring rules for lessons, on top of the ones above: one idea per scene; reveal a term, a line or a node when the
+narration reaches it; keep burned captions clear of content (`EDU.zone` reserves their strip); size text for the phone
+sheet, not for the 16:9 frame; use the exact strings, numbers and code from the storyboard.
