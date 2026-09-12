@@ -181,7 +181,7 @@
     TL, GRID, BEATS, FMT, W, H, FPS, DUR, LEAD, leadFor, stage, pick,
     at, bt: T.beat, clamp, lerp, seg, ease, sp, spHit, trk, trkObj, win, mulberry32, noise1,
     el, frag, reg, put, commit, inset, rectOf, scene, canvas, hooks, SCENES,
-    fonts: [],              // film.js: e.g. C.fonts = ['600 100px Display', '400 40px UI'] — awaited before frame 0
+    fonts: [],              // film.js: e.g. C.fonts.push('600 100px Display', '400 40px UI') — awaited before frame 0
   };
 
   // ------------------------------------------------------------------ boot (called at the end of film.js)
