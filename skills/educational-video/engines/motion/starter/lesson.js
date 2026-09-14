@@ -122,7 +122,7 @@
         curves: [{ fn: (n) => Math.log2(n), from: 1, at: 'curve', dur: 1.8, color: 'accent', label: 'log₂ n' }],
         points: [{ x: 8, y: 3, at: 'pt', label: '8 items: 3 looks', color: 'hi', align: 'right' }],
         segments: [{ from: [8, 0], to: [8, 3], at: 'pt', dash: [10, 10], color: 'hi' }],
-        markers: [{ curve: 0, stops: [['m1', 4], ['m2', 16]], drop: true, label: (n, k) => `n=${n}: ${k} looks` }],
+        markers: [{ curve: 0, stops: [['m1', 4], ['m2', 16]], drop: true, label: (n, k) => `n=${Math.round(n)}: ${k.toFixed(1)} looks` }],
       });
     },
     run(t, S) { S.p.run(t); },
