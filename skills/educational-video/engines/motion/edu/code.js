@@ -38,7 +38,7 @@
     const probe = el('span', { class: 'mono', style: 'position:absolute;visibility:hidden;white-space:pre' }, box, 'M'.repeat(40));
     const rows = lines.map((ln, i) => {
       const row = el('div', { class: 'code ln', style: `left:${pad}px;top:${pad + i * lh}px;width:${w - 2 * pad}px;height:${lh}px` }, box);
-      if (gutter) el('span', { style: `position:absolute;left:0;width:${gutter - size * 0.9}px;text-align:right;color:var(--ink-2);opacity:.6` }, row, String(i + 1));
+      if (gutter) el('span', { style: `position:absolute;left:0;width:${gutter - size * 0.9}px;text-align:right;color:color-mix(in srgb, var(--ink-2) 60%, transparent)` }, row, String(i + 1));
       const text = el('span', { style: `position:absolute;left:${gutter}px;top:0` }, row);
       reg(row, { o: 0 }); reg(text);
       return { row, text, ln };

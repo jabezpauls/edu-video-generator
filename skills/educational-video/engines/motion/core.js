@@ -105,11 +105,16 @@
   // 2D transforms only, and no will-change: a composited layer (translate3d / will-change / 3D rotate) keeps a cached
   // raster whose pixels depend on which frame was painted before, which breaks seek(t) determinism (render --verify).
   const TF = ['x', 'y', 's', 'sx', 'sy', 'r'];
+  // A settled spring is the identity to within what the transform string can express. Write no transform then: an element
+  // that once carried a real transform and one that never did must paint the same pixels (Chromium keeps raster state of
+  // text that has moved), or a frame would depend on the frames painted before it.
+  const identity = (p) => Math.abs(p.x || 0) < 0.005 && Math.abs(p.y || 0) < 0.005 && Math.abs(p.r || 0) < 0.0005 &&
+    Math.abs((p.s ?? 1) * (p.sx ?? 1) - 1) < 5e-6 && Math.abs((p.s ?? 1) * (p.sy ?? 1) - 1) < 5e-6;
   function commit() {
     for (const e of REG) {
       const p = Object.assign({}, e._base, OVER.get(e) || {});
       const st = {};
-      if (TF.some((k) => p[k] != null)) {
+      if (TF.some((k) => p[k] != null) && !identity(p)) {
         const s = p.s ?? 1;
         st.transform = `translate(${(p.x || 0).toFixed(2)}px, ${(p.y || 0).toFixed(2)}px) rotate(${(p.r || 0).toFixed(3)}deg) scale(${(s * (p.sx ?? 1)).toFixed(5)}, ${(s * (p.sy ?? 1)).toFixed(5)})`;
       }

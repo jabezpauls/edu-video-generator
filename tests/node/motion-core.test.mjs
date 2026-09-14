@@ -113,3 +113,17 @@ test('trk takes whens and keeps a continuous value across retargets', async () =
   assert.ok(Math.abs(f(5.5 - 1e-6) - f(5.5 + 1e-6)) < 1e-2);
   assert.ok(Math.abs(f(9) - 40) < 0.5);
 });
+
+test('a settled element carries no transform, a moving one does', async () => {
+  const ctx = loadEngine({ TL, GRID, film: (c) => {
+    c.C.scene({ name: 's01', from: 0, to: 8, build(root, S) { S.b = c.C.el('div', {}, root); c.C.reg(S.b); },
+      run(t, S) { const p = c.C.sp(t, 'open', 'snappy'); c.C.put(S.b, { x: 100 * (1 - p), s: 0.9 + 0.1 * p }); } });
+    c.C.start();
+  } });
+  await ctx.READY;
+  const box = () => ctx.stage.children[0].children[0];
+  ctx.seek(0.6);
+  assert.match(box().style.transform || '', /translate\(/);
+  ctx.seek(5);
+  assert.equal(box().style.transform || '', '');
+});
