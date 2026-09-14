@@ -88,6 +88,21 @@ def test_motion_engine_scaffold(tmp_path):
     assert "playwright" in json.loads((project / "package.json").read_text())["devDependencies"]
 
 
+def test_motion_scaffold_has_every_file_the_page_loads(tmp_path):
+    import re
+    subprocess.run(["bash", str(SCRIPT), str(tmp_path), "demo", "motion"], check=True, capture_output=True)
+    film = tmp_path / "demo" / "film"
+    page = (film / "index.html").read_text()
+    refs = re.findall(r'(?:src|href)="([^"]+)"', page)
+    assert any(r.startswith("edu/") for r in refs) and any("katex" in r for r in refs)
+    missing = [r for r in refs if not (film / r).is_file()]
+    assert not missing, missing
+    # the KaTeX stylesheet points at fonts that were copied too
+    css = (film / "vendor/katex/katex.min.css").read_text()
+    fonts = set(re.findall(r"url\(fonts/([^)]+)\)", css))
+    assert fonts and all((film / "vendor/katex/fonts" / f).is_file() for f in fonts)
+
+
 def test_scaffold_never_overwrites_the_film(tmp_path):
     subprocess.run(["bash", str(SCRIPT), str(tmp_path), "demo", "motion"], check=True,
                    capture_output=True)

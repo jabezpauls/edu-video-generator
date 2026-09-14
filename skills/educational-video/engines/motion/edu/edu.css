@@ -1,0 +1,24 @@
+/* Lesson components (equation, code, plot, diagram, captions). Colours come from the look tokens in index.html, so a
+   preset restyles the components too. Override --c-* to retheme syntax highlighting alone. */
+:root {
+  --c-kw: var(--hi); --c-str: var(--accent); --c-num: var(--accent); --c-com: var(--ink-2);
+  --c-fn: var(--ink); --c-op: var(--ink-2); --c-line: color-mix(in srgb, var(--hi) 14%, transparent);
+  --edu-dim: 0.28;
+}
+/* KaTeX sets 1.21em on .katex: pin it so the size you pass is the size you get */
+.eq .katex { font-size: 1em; }
+.eq .katex-html { white-space: nowrap; }
+.eq-term { display: inline-block; border-radius: 0.14em; }
+.code { font-family: var(--font-mono); white-space: pre; position: absolute; left: 0; top: 0; }
+.code .ln { position: absolute; left: 0; white-space: pre; }
+.code .t-kw { color: var(--c-kw); font-weight: 600; }
+.code .t-str { color: var(--c-str); }
+.code .t-num { color: var(--c-num); }
+.code .t-com { color: var(--c-com); font-style: italic; }
+.code .t-fn { color: var(--c-fn); font-weight: 600; }
+.code .t-op { color: var(--c-op); }
+.dnode { position: absolute; left: 0; top: 0; display: flex; align-items: center; justify-content: center;
+         font-family: var(--font-mono); font-weight: 600; box-sizing: border-box; }
+.dlabel { position: absolute; left: 0; top: 0; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; text-align: center; }
+.cap { position: absolute; left: 0; top: 0; font-family: var(--font-display); font-weight: 700; white-space: nowrap; line-height: 1.12; }
+.cap .w { display: inline-block; }
