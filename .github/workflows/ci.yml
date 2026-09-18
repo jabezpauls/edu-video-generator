@@ -18,12 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      # the spring parity tests load the TypeScript templates, which needs Node's built-in type stripping
+      - run: node -e "if (!process.features.typescript) { console.error('Node ' + process.version + ' cannot strip types'); process.exit(1); }"
       - run: npm test
 
   python:

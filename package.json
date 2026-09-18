@@ -7,5 +7,5 @@
     "test": "node --test tests/node",
     "test:py": "uv run --with pytest pytest tests/py"
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=22.18" }
 }
