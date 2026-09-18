@@ -137,3 +137,29 @@ test('a cues.json planned by grid.py survives sync unless the timeline declares 
   assert.equal(out.source, 'timeline');
   assert.deepEqual(out.cues.map((c) => c.t), [2]);
 });
+
+test('narration words reach the captions, formats follow the storyboard, a preset is passed on', () => {
+  const dir = project({
+    'timeline.json': { duration: 8, formats: ['16x9'] },
+    'storyboard.json': { mode: 'short', scenes: [{ id: '01', est_duration_s: 8 }] },
+    'grid.json': { duration: 8, scenes: [{ id: '01', start: 0, end: 8, words: [{ word: 'Halve', start: 0.4, end: 0.7 }, { word: 'it.', start: 0.7, end: 1 }] }], cues: { 's01.halve': 0.4 } },
+    'preset.json': { name: 'Paper', colors: { bg: '#fff' } },
+  });
+  const r = run(dir);
+  assert.equal(r.status, 0, r.stderr);
+  const d = data(dir);
+  assert.deepEqual(d.TL.formats, ['9x16'], 'short mode renders 9x16 even when the timeline says 16x9');
+  assert.deepEqual(d.TL.captions.burn, ['9x16']);
+  assert.deepEqual(d.GRID.words, [{ w: 'Halve', t: 0.4, e: 0.7 }, { w: 'it.', t: 0.7, e: 1 }]);
+  assert.equal(d.PRESET.name, 'Paper');
+  assert.match(r.stderr, /formats .* differ/);
+});
+
+test('without a storyboard the timeline decides the formats; no preset means null', () => {
+  const dir = project({ 'timeline.json': { duration: 3, formats: ['1x1'] } });
+  assert.equal(run(dir).status, 0);
+  const d = data(dir);
+  assert.deepEqual(d.TL.formats, ['1x1']);
+  assert.equal(d.PRESET, null);
+  assert.deepEqual(d.GRID.words, []);
+});
