@@ -23,24 +23,25 @@ class FakeEl {
 export function walk(e, fn) { fn(e); for (const c of e.children) if (c instanceof FakeEl) walk(c, fn); }
 
 /** opts: { fmt, TL, GRID, BEATS, film(ctx) } → the context (ctx.C, ctx.TYPE, ctx.seek once C.start() ran) */
-export function loadEngine({ fmt = null, TL = {}, GRID = {}, BEATS = {}, film = null } = {}) {
+export function loadEngine({ fmt = null, TL = {}, GRID = {}, BEATS = {}, PRESET = null, film = null } = {}) {
   const stage = new FakeEl('div');
   const ctx = {
     console, performance, Math, JSON, Object, Array, Number, String, Error, Promise, URLSearchParams, Float32Array,
-    TL: { duration: 10, fps: 60, formats: ['16x9'], ...TL }, GRID, BEATS,
+    TL: { duration: 10, fps: 60, formats: ['16x9'], ...TL }, GRID, BEATS, PRESET, loadedFaces: [],
+    FontFace: class { constructor(family, src, desc) { this.family = family; this.src = src; this.desc = desc; } async load() { return this; } },
     location: { search: fmt ? `?fmt=${fmt}` : '' },
     document: {
       getElementById: () => stage,
       createElement: (t) => new FakeEl(t),
       createTextNode: (s) => ({ text: s, children: [] }),
-      images: [], fonts: { load: async () => [{}], ready: Promise.resolve() },
+      images: [], fonts: { load: async () => [{}], ready: Promise.resolve(), add: (f) => ctx.loadedFaces.push(f) },
       body: { classList: { add() {} }, addEventListener() {} },
     },
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const f of ['lib/motion.js', 'lib/time.js']) vm.runInContext(readFileSync(join(ENGINE, f), 'utf8'), ctx, { filename: f });
-  ctx.window.TL = ctx.TL; ctx.window.GRID = ctx.GRID; ctx.window.BEATS = ctx.BEATS;
+  ctx.window.TL = ctx.TL; ctx.window.GRID = ctx.GRID; ctx.window.BEATS = ctx.BEATS; ctx.window.PRESET = ctx.PRESET;
   for (const f of ['core.js', 'type.js']) vm.runInContext(readFileSync(join(ENGINE, f), 'utf8'), ctx, { filename: f });
   if (film) film(ctx);
   ctx.stage = stage;

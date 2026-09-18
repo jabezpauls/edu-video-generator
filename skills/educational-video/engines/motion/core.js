@@ -190,7 +190,33 @@
   };
 
   // ------------------------------------------------------------------ boot (called at the end of film.js)
+  /**
+   * A look preset (window.PRESET, from the project's preset.json via sync.mjs) becomes the :root tokens and the two font faces:
+   * display -> 'Display' / --font-display, body -> 'UI' / --font-ui (also --font-body). Returns the promise that loads the faces.
+   */
+  function applyPreset() {
+    const P = window.PRESET;
+    if (!P) return Promise.resolve();
+    const set = (k, v) => v && stage.style.setProperty(k, v);
+    const c = P.colors || {};
+    set('--bg', c.bg); set('--ink', c.ink); set('--ink-2', c.ink2); set('--accent', c.accent); set('--hi', c.highlight); set('--card', c.card);
+    const loads = [];
+    for (const [role, family, cssVar] of [['display', 'Display', '--font-display'], ['body', 'UI', '--font-ui']]) {
+      const f = (P.fonts || {})[role];
+      if (!f || !f.woff2) continue;
+      const face = new FontFace(family, `url(../${f.woff2})`, { weight: '100 900' });
+      loads.push(face.load().then((ff) => { document.fonts.add(ff); }, () => console.warn(`preset font failed: ${f.woff2}`)));
+      set(cssVar, `'${family}', 'Helvetica Neue', Arial, sans-serif`);
+      if (role === 'display' && f.tracking) set('--display-tracking', f.tracking);
+    }
+    set('--font-body', 'var(--font-ui)');
+    return Promise.all(loads);
+  }
+
+  C.onStart = [];           // functions run once at the start of C.start(), before scenes build (the burned captions add their overlay here)
   C.start = () => {
+    for (const f of C.onStart) f();
+    const presetReady = applyPreset();
     for (const S of SCENES) S.build && S.build(S.root, S);
     // resolve every name once, now: a typo in a mark or a scene window fails before the first frame, not mid-render
     const MARKS = T.resolveMarks();
@@ -201,6 +227,7 @@
     window.CUTS = SCENES.filter((S) => (S.cut ?? S.pre === 0) && at(S.from) > 0).map((S) => at(S.from)).sort((a, b) => a - b);
     window.seek = (t) => paint(Math.max(0, Math.min(DUR - 1e-6, t)));
     window.READY = (async () => {
+      await presetReady;
       // a missing face must be loud (the render logs [page] warnings) but not fatal: the stack falls back
       await Promise.all(C.fonts.map((f) => document.fonts.load(f).then((r) => { if (!r.length) console.warn(`font not loaded: ${f} (falling back)`); },
         () => console.warn(`font failed: ${f} — check the @font-face url in film/index.html (falling back)`))));

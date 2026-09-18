@@ -10,7 +10,8 @@
 // the bottom 20 % or the right 12 %. Options: { size, w (max width), cx, bottom (y of the bottom edge), maxLines,
 // maxChars, maxWords, style: 'pill' | 'plain', color, active: 'accent' | 'hi' }.
 // The word list is data, not code: when the narration grid exists it supplies it (C.GRID.words), a film can pass words
-// from anywhere, and nothing else changes.
+// from anywhere, and nothing else changes. With narration, the overlay is added automatically for the formats in
+// timeline.json captions.burn (default 9x16): see the end of this file.
 (() => {
   const C = window.C, E = window.EDU, CP = window.CaptionPlan;
   const { put, reg, el, sp, spHit, pick, W, H, clamp } = C;
@@ -28,11 +29,15 @@
     const bottom = o.bottom ?? pick(H * 0.94, H * 0.9, H * 0.74);
     const maxChars = o.maxChars || Math.max(12, Math.floor(w / (size * 0.56)));
     const pages = CP.pages(words, { maxChars, maxLines: o.maxLines || pick(2, 2, 3), maxWords: o.maxWords || 8, hold: o.hold });
-    const pill = (o.style || 'pill') === 'pill', activeTone = o.active || 'accent';
+    // a preset's caption style is the default: pill | plain | outline (plain with a stroke in the background colour)
+    const PC = (window.PRESET && window.PRESET.captions) || {};
+    const styleName = o.style || PC.style || 'pill';
+    const pill = styleName === 'pill', activeTone = o.active || (PC.active_word === 'highlight' ? 'hi' : 'accent');
+    const stroke = styleName === 'outline' ? ';-webkit-text-stroke:0.16em var(--bg);paint-order:stroke fill' : '';
 
     const built = pages.map((pg) => {
       const box = el('div', { class: 'cap', style: `left:${cx - w / 2}px;top:auto;bottom:${H - bottom}px;width:${w}px;font-size:${size}px;text-align:center;transform-origin:50% 100%;` +
-        `color:${E.tone(o.color || 'ink')}` }, parent);
+        `color:${E.tone(o.color || 'ink')}${stroke}` }, parent);
       const inner = el('div', { style: pill ? `display:inline-block;padding:${size * 0.28}px ${size * 0.5}px ${size * 0.34}px;border-radius:${size * 0.5}px;` +
         `background:color-mix(in srgb, var(--card) 94%, transparent);box-shadow:0 2px 6px rgba(0,0,0,.06), 0 18px 50px -18px rgba(0,0,0,.28)` : 'display:inline-block' }, box);
       const lines = pg.lines.map((idx) => {
@@ -70,4 +75,14 @@
   });
 
   E.captions = captions;
+
+  // Burned-in captions come with the film: whenever narration words exist (C.GRID.words) and this render's format is listed in
+  // timeline.json captions.burn (default ["9x16"]; sync.mjs fills it in), the overlay is added by C.start(), so a lesson
+  // never has to remember it. A film that adds its own EDU.captions.overlay (name 'captions') or sets captions.auto false keeps control.
+  C.onStart.push(() => {
+    const cfg = C.TL.captions || {};
+    if (cfg.auto === false || !(cfg.burn || ['9x16']).includes(C.FMT)) return;
+    if (!(C.GRID.words && C.GRID.words.length) || C.SCENES.some((S) => S.name === 'captions')) return;
+    captions.overlay({});
+  });
 })();
