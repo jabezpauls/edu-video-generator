@@ -44,3 +44,4 @@ Thumbs.db
 # Motion engine project outputs
 renders/
 review/
+uv.lock
