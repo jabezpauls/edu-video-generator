@@ -122,3 +122,19 @@ def test_font_file_needs_family(ap, tmp_path):
 def test_unknown_preset_lists_the_choices(ap, tmp_path):
     with pytest.raises(ap.PresetError, match="chalkboard"):
         ap.apply("nope", tmp_path)
+
+
+def motion_project(tmp_path):
+    (tmp_path / "film").mkdir()
+    (tmp_path / "film" / "index.html").write_text("<html></html>")
+    return tmp_path
+
+
+def test_motion_project_gets_the_resolved_preset_and_woff2_only(ap, tmp_path):
+    p = motion_project(tmp_path)
+    ap.apply("chalkboard", p)
+    assert (p / "assets/fonts/display.woff2").is_file() and (p / "assets/fonts/body.woff2").is_file()
+    assert not list((p / "assets/fonts").glob("*.ttf"))
+    assert not (p / "scenes").exists(), "theme files are for Manim and Remotion"
+    r = json.loads((p / "preset.json").read_text())
+    assert r["colors"]["highlight"] == "#ff8fa3" and r["fonts"]["body"]["woff2"] == "assets/fonts/body.woff2"

@@ -97,6 +97,7 @@ render_motion() {
     *) echo "unknown quality for motion: $Q (low|med|high|verify|sheet)" >&2; return 2;;
   esac
   : > "$log"
+  ensure_preset "$abs" >>"$log" 2>&1 || { tail -n 3 "$log" >&2; return 1; }
   echo ">> sync + render.mjs $Q ($scene)" | tee -a "$log"
   node "$here/sync.mjs" --project "$abs" --quiet >>"$log" 2>&1 || { tail -n 5 "$log" >&2; return 1; }
   local -a formats
@@ -121,6 +122,16 @@ render_motion() {
   [[ "$Q" == "verify" || "$Q" == "sheet" ]] && grep -v '^>>' "$log"
   if [[ $rc -ne 0 ]]; then echo "motion render failed (see $log):" >&2; tail -n 8 "$log" >&2; fi
   return $rc
+}
+
+# the storyboard's preset must be the one applied to the project (apply_preset.py writes preset.json + fonts)
+ensure_preset() {
+  local proj="$1" want have
+  want="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" "$proj/storyboard.json" 2>/dev/null || true)"
+  have="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" "$proj/manifest.json" 2>/dev/null || true)"
+  [[ -z "$want" || ( "$want" == "$have" && -f "$proj/preset.json" ) ]] && return 0
+  echo ">> applying preset $want"
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apply_preset.py" "$want" "$proj"
 }
 
 have_node() { command -v node >/dev/null 2>&1 || { echo "node not found" >&2; return 1; }; }

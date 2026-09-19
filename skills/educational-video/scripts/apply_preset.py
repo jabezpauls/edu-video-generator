@@ -14,6 +14,10 @@ fonts. Writes, inside the project:
   scenes/public/fonts/      the .woff2 files Remotion serves with staticFile()
   manifest.json             "preset" set, if a manifest exists
 
+A motion-engine project (film/index.html exists) only gets preset.json and assets/fonts/: the film reads
+those through sync.mjs (window.PRESET), so run sync.mjs or render.sh afterwards. The theme files above are
+left out of it.
+
 Safe to re-run; a changed preset just rewrites the generated files.
 """
 from __future__ import annotations
@@ -301,36 +305,42 @@ if (typeof document !== "undefined" && FACES.length > 0) {{
 '''
 
 
+def is_motion_project(project: Path) -> bool:
+    return (project / "film" / "index.html").is_file() and not (project / "scenes" / "package.json").is_file()
+
+
 def apply(preset: str, project: Path, presets_dir: Path | None = None) -> dict:
     project = project.resolve()
     folder = find_preset(preset, project, presets_dir)
     p = resolve(parse_jsonc((folder / "preset.jsonc").read_text(encoding="utf-8")), folder)
 
+    motion = is_motion_project(project)
     fonts_dir = project / "assets" / "fonts"
     web_dir = project / "scenes" / "public" / "fonts"
     ttf_files, woff_files = {}, {}
     for role in ("display", "body"):
         f = p["fonts"][role]
         for kind, dest_dir in (("ttf", fonts_dir), ("woff2", fonts_dir)):
-            if f[kind]:
+            if f[kind] and not (motion and kind == "ttf"):
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest = dest_dir / f"{role}.{kind}"
                 shutil.copyfile(f[kind], dest)
-        if f["woff2"]:
+        if f["woff2"] and not motion:
             web_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(f["woff2"], web_dir / f"{role}.woff2")
             woff_files[role] = web_dir / f"{role}.woff2"
-        if f["ttf"]:
+        if f["ttf"] and not motion:
             ttf_files[role] = fonts_dir / f"{role}.ttf"
 
-    scenes = project / "scenes"
-    scenes.mkdir(parents=True, exist_ok=True)
-    (scenes / "theme.py").write_text(theme_py(p, ttf_files), encoding="utf-8")
-    (scenes / "src").mkdir(parents=True, exist_ok=True)
-    (scenes / "src" / "theme.ts").write_text(theme_ts(p, woff_files), encoding="utf-8")
+    if not is_motion_project(project):
+        scenes = project / "scenes"
+        scenes.mkdir(parents=True, exist_ok=True)
+        (scenes / "theme.py").write_text(theme_py(p, ttf_files), encoding="utf-8")
+        (scenes / "src").mkdir(parents=True, exist_ok=True)
+        (scenes / "src" / "theme.ts").write_text(theme_ts(p, woff_files), encoding="utf-8")
 
     resolved = {**p, "fonts": {k: {**v, "woff2": f"assets/fonts/{k}.woff2" if v["woff2"] else None,
-                                   "ttf": f"assets/fonts/{k}.ttf" if v["ttf"] else None}
+                                   "ttf": f"assets/fonts/{k}.ttf" if v["ttf"] and not motion else None}
                                for k, v in p["fonts"].items()}}
     (project / "preset.json").write_text(json.dumps(resolved, indent=2) + "\n", encoding="utf-8")
 

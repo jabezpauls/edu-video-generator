@@ -3,6 +3,7 @@
 # Files only, no network: bootstrap.sh installs Playwright afterwards.
 # Usage: scaffold_motion.sh <project-dir> [--update]
 #   --update  refresh the engine files (core, type, lib, edu, vendor, index.html) and leave your film, timeline and data alone
+# Applies the storyboard's preset when it names one (apply_preset.py).
 # Safe to re-run: existing film.js, timeline.json and package.json are never overwritten.
 set -euo pipefail
 
@@ -39,6 +40,12 @@ if [[ ! -f "$PROJECT/package.json" ]]; then
   "devDependencies": { "playwright": "^1.50.0" }
 }
 PKG
+fi
+
+# the storyboard's preset (if it names one) becomes preset.json + assets/fonts/, which sync.mjs hands to the film
+PRESET="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" "$PROJECT/storyboard.json" 2>/dev/null || true)"
+if [[ -n "$PRESET" ]]; then
+  python3 "$SKILL/scripts/apply_preset.py" "$PRESET" "$PROJECT" >&2 || echo "preset '$PRESET' could not be applied" >&2
 fi
 
 # data.js is generated from the timeline (and the storyboard / narration grid when they exist)
