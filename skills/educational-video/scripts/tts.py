@@ -10,7 +10,9 @@ Scenes whose narration text, provider and voice are unchanged since the last run
 
 Usage: tts.py <project-dir> [--force] [--provider NAME]
 Providers: elevenlabs | openai | piper | espeak-ng
-Voice: ELEVENLABS_VOICE_ID, OPENAI_TTS_VOICE, or "voice" in .videogen/env.json
+Voice: "voice" in .videogen/env.json, else ELEVENLABS_VOICE_ID / OPENAI_TTS_VOICE, else the applied preset's
+voice for the provider (preset.json), else the provider default. A Piper voice the preset names but that is not
+downloaded into assets/tts/ is skipped with a warning.
 """
 import base64
 import hashlib
@@ -19,6 +21,9 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import projectcfg  # noqa: E402
 
 
 def load(project):
@@ -130,13 +135,19 @@ def main():
 
     model = env.get("model") or None
     voice = env.get("voice") or None
+    preset_voice = (projectcfg.preset(project).get("voice") or {}).get(provider) or None
     if provider == "elevenlabs":
         model = model or "eleven_multilingual_v2"
-        voice = voice or os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+        voice = voice or os.environ.get("ELEVENLABS_VOICE_ID") or preset_voice or "21m00Tcm4TlvDq8ikWAM"
     elif provider == "openai":
-        voice = voice or os.environ.get("OPENAI_TTS_VOICE", "alloy")
+        voice = voice or os.environ.get("OPENAI_TTS_VOICE") or preset_voice or "alloy"
     elif provider == "piper":
-        model = model or "en_US-amy-medium"
+        if preset_voice and not os.path.isfile(os.path.join(project, "assets", "tts", preset_voice + ".onnx")):
+            print(f"warning: the preset's Piper voice {preset_voice} is not in assets/tts/ "
+                  f"(python -m piper.download_voices --download-dir assets/tts {preset_voice}); using {model or 'the default'}",
+                  file=sys.stderr)
+            preset_voice = None
+        model = (preset_voice if not env.get("model") else None) or model or "en_US-amy-medium"
 
     cache_path = os.path.join(audio_dir, "tts_cache.json")
     cache = json.load(open(cache_path)) if os.path.isfile(cache_path) else {}
