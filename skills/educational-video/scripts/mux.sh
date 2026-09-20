@@ -72,7 +72,7 @@ DUR="$(probe "$CONCAT")"
 # 3. Master the audio when it is missing or stale
 stale=""
 if [[ -n "$REMIX" || ! -f "$MIX" || "$GRID" -nt "$MIX" ]]; then stale=1; fi
-for f in "$PROJECT"/audio/scene_*.wav "$PROJECT"/audio/music.wav "$PROJECT"/audio/sfx.wav; do
+for f in "$PROJECT"/audio/scene_*.wav "$PROJECT"/audio/music.wav "$PROJECT"/audio/sfx.wav "$PROJECT"/preset.json "$PROJECT"/mix.json; do
   [[ -f "$f" && "$f" -nt "$MIX" ]] && stale=1
 done
 if [[ -n "$stale" ]]; then

@@ -159,3 +159,13 @@ def test_errors(tmp_path):
     (tmp_path / "grid.json").write_text(json.dumps({"duration": 5, "scenes": []}))
     r = run(tmp_path)
     assert r.returncode == 1 and "nothing to mix" in r.stderr
+
+
+def test_preset_moves_the_levels_and_can_drop_the_sfx(mix, tmp_path):
+    ns = type("A", (), dict(music=None, sfx=None, vo=None, target=None, no_duck=False))
+    assert mix.load_levels(str(tmp_path), ns)["sfx"] == -9.0
+    (tmp_path / "preset.json").write_text(json.dumps({"music": {"level_db": -3}, "sfx": {"level_db": -2, "enabled": False}}))
+    lv = mix.load_levels(str(tmp_path), ns)
+    assert (lv["music"], lv["sfx"], lv.get("sfx_off")) == (-20.0, -11.0, True)
+    (tmp_path / "mix.json").write_text('{"sfx": -5}')
+    assert mix.load_levels(str(tmp_path), ns)["sfx"] == -5, "mix.json beats the preset"
