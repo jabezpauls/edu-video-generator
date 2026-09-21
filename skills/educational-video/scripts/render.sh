@@ -105,6 +105,8 @@ render_motion() {
   local first="${formats[0]}"
   local rc=0
   if [[ "$scene" == "all" ]]; then
+    # soft subtitles ride along in every format but 9x16 (there the film burns word-synced captions into the picture)
+    [[ "$Q" != "verify" && "$Q" != "sheet" && -f "$abs/output/subtitles.srt" ]] && flags+=(--subs "$abs/output/subtitles.srt")
     node "$here/render.mjs" --project "$abs" --all "${flags[@]}" >>"$log" 2>&1 || rc=$?
     if [[ $rc -eq 0 && "$Q" != "verify" && "$Q" != "sheet" ]]; then
       local fmt name

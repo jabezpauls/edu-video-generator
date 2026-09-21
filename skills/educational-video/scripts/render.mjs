@@ -10,6 +10,8 @@
 //   --range 3,5 | --scene 02 [--blur 0]                         a clip: seconds 3-5, or one scene by storyboard id
 //   --mux [--all]                                               re-mux audio/mix.wav into existing renders without re-rendering
 //   --verify [--all]                                            determinism check: 12 probes, cold vs after seeking elsewhere
+//   --subs file.srt                                             soft subtitle track (mov_text) in the finals and in --mux; skipped for 9x16, where the
+//                                                              captions are burned into the picture by the film (needs narration words in grid.json)
 //   options: --tag name (output prefix)  --fps N  --blur 0|1 (default 1 for finals)  --crf N  --audio path (default audio/mix.wav if present)  --out file
 import http from 'node:http';
 import fs from 'node:fs';
@@ -44,6 +46,9 @@ const DRAFT = has('draft');
 const TAG = String(opt('tag', DRAFT ? 'draft' : '')).replace(/[^\w-]/g, '') ;   // output name prefix: renders/<tag>_<fmt>.mp4
 const AUDIO = path.resolve(ROOT, String(opt('audio', 'audio/mix.wav')));
 const hasAudio = fs.existsSync(AUDIO);
+const SUBS = has('subs') ? path.resolve(ROOT, String(opt('subs'))) : null;
+if (SUBS && !fs.existsSync(SUBS)) die(`no subtitles at ${SUBS}`);
+const subsFor = (fmt) => (SUBS && fmt !== '9x16' ? SUBS : null);
 const mkdir = (d) => fs.mkdirSync(d, { recursive: true });
 const rel = (p) => path.relative(ROOT, p);
 const run = (cmd, a) => { const r = spawnSync(cmd, a, { stdio: ['ignore', 'inherit', 'pipe'] }); if (r.status) throw new Error(`${cmd} failed: ${r.stderr}`); return r; };
@@ -54,7 +59,9 @@ if (has('mux')) {
   for (const fmt of FORMATS) {
     const src = path.join(ROOT, `renders/${fmt}.mp4`), tmp = src + '.tmp.mp4';
     if (!fs.existsSync(src)) die(`no render to mux into: ${rel(src)} (render it first)`);
-    run('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-i', AUDIO, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-shortest', '-movflags', '+faststart', tmp]);
+    const subs = subsFor(fmt);
+    run('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-i', AUDIO, ...(subs ? ['-i', subs] : []), '-map', '0:v', '-map', '1:a', ...(subs ? ['-map', '2:s'] : []),
+      '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', ...(subs ? ['-c:s', 'mov_text', '-metadata:s:s:0', 'language=eng'] : []), '-shortest', '-movflags', '+faststart', tmp]);
     fs.renameSync(tmp, src); console.log('muxed', rel(src));
   }
   process.exit(0);
@@ -218,13 +225,15 @@ for (const fmt of FORMATS) {
     const clip = has('range') || has('scene');
     const out = path.resolve(ROOT, String(opt('out', path.join('renders', clip ? `${tag}.mp4` : `${TAG ? TAG + '_' : ''}${fmt}.mp4`))));
     mkdir(path.dirname(out));
-    const withAudio = hasAudio;
+    const withAudio = hasAudio, subs = subsFor(fmt);
     const { p, done } = ffmpeg([
       '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${F.W}x${F.H}`, '-framerate', String(fps), '-probesize', '100M', '-i', '-',
       ...(withAudio ? ['-ss', String(a), '-t', String(b - a), '-i', AUDIO] : []),
+      ...(subs ? ['-ss', String(a), '-t', String(b - a), '-i', subs] : []),
       '-c:v', 'libx264', '-preset', DRAFT ? 'veryfast' : 'slow', '-crf', String(opt('crf', DRAFT ? 22 : 16)), '-pix_fmt', 'yuv420p', '-profile:v', 'high',
       '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
       ...(withAudio ? ['-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '320k', '-shortest'] : []),
+      ...(subs ? ['-map', withAudio ? '2:s' : '1:s', '-c:s', 'mov_text', '-metadata:s:s:0', 'language=eng'] : []),
       '-movflags', '+faststart', out,
     ]);
     // Adaptive 180° motion blur: each frame is probed at two shutter points; the mean pixel difference sets how many
@@ -257,7 +266,7 @@ for (const fmt of FORMATS) {
       if (i % 60 === 0) process.stdout.write(`${process.stdout.isTTY ? '\r' : ''}${fmt} frame ${i}/${N}  ${((Date.now() - t0) / 1000).toFixed(0)}s${process.stdout.isTTY ? '   ' : '\n'}`);
     }
     p.stdin.end(); await done;
-    console.log(`${process.stdout.isTTY ? '\n' : ''}wrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    console.log(`${process.stdout.isTTY ? '\n' : ''}wrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}${subs ? '  + ' + rel(subs) : ''}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }
   await F.page.close();
 }
