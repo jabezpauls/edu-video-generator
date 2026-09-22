@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Project settings the audio scripts share: the applied preset (preset.json) and the storyboard mode."""
 import json
 import os
