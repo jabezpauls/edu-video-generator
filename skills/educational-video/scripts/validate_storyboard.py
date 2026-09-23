@@ -21,6 +21,9 @@ DEFAULT_FORMATS = {"lesson": ["16x9"], "short": ["9x16"]}
 PRESET_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 SHORT_RANGE_S = (30, 60)
+SHORT_HOOK_MAX_S = 3.0        # the hook must land inside the first three seconds
+SHORT_WORDS_PER_S = 2.6       # speaking rate used to estimate how long a narration takes
+SHORT_MAX_SCENES = 8
 # Beat anchor: "<word>", "<word>#2", "w12", "p2", "start", "end", optionally prefixed with a
 # scene cue namespace, e.g. "s03.derivative". Resolved against grid.json once narration exists.
 ANCHOR_RE = re.compile(r"^(?:s(?P<scene>\d+)\.)?(?P<name>[^\W_](?:[\w'\u2019-]*[^\W_])?)"
@@ -86,6 +89,33 @@ def _check_v2_fields(sb, errs, warns):
         lo, hi = SHORT_RANGE_S
         if target is not None and not (lo <= target <= hi):
             errs.append(f"short mode: target_duration_s must be {lo}-{hi}s, got {target:g}s")
+
+
+def _check_short(sb, scenes, errs, warns):
+    """Short-mode rules: a 9:16 micro-lesson that hooks inside 3 s, teaches one idea, then pays off."""
+    fmts = sb.get("formats")
+    if isinstance(fmts, list) and fmts and "9x16" not in fmts:
+        warns.append("short mode: formats has no 9x16, the format shorts are made for")
+    if sb.get("narration") is False:
+        warns.append("short mode: narration is off, so the burned-in captions have nothing to show")
+    if len(scenes) > SHORT_MAX_SCENES:
+        warns.append(f"short mode: {len(scenes)} scenes in under a minute is more than one idea; "
+                     f"aim for {SHORT_MAX_SCENES} or fewer")
+    hook = scenes[0] if isinstance(scenes[0], dict) else {}
+    where = f"scene[0] (the hook, id {hook.get('id')!r})"
+    words = len(str(hook.get("narration") or "").split())
+    if words / SHORT_WORDS_PER_S > SHORT_HOOK_MAX_S:
+        errs.append(f"{where}: the narration is {words} words (~{words / SHORT_WORDS_PER_S:.1f} s); "
+                    f"the hook must be spoken within {SHORT_HOOK_MAX_S:g} s (about "
+                    f"{int(SHORT_HOOK_MAX_S * SHORT_WORDS_PER_S)} words)")
+    est = _num(hook.get("est_duration_s"))
+    if est is not None and est > SHORT_HOOK_MAX_S + 2:
+        errs.append(f"{where}: est_duration_s {est:g}s is too long for a hook "
+                    f"(speech {SHORT_HOOK_MAX_S:g} s plus lead-in and tail); the idea starts in scene 2")
+    beats = [b for b in (hook.get("beats") or []) if isinstance(b, dict)]
+    early = [b for b in beats if "on" in b or (_num(b.get("t")) is not None and _num(b["t"]) <= 1.0)]
+    if not early:
+        errs.append(f"{where}: needs a beat at t <= 1 s (frame 0 must already show the hook)")
 
 
 def check(sb) -> tuple:
@@ -164,6 +194,9 @@ def check(sb) -> tuple:
                 if t < last_t:
                     errs.append(f"{bloc}: t not in ascending order")
                 last_t = t
+
+    if sb.get("mode") == "short":
+        _check_short(sb, scenes, errs, warns)
 
     known = {str(i) for i in ids}
     for bloc, num, home in anchors:
