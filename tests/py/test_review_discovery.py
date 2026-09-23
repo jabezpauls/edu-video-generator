@@ -64,3 +64,13 @@ def test_analyze_streams_per_frame_arrays(review, tmp_path):
     assert 28 <= len(a["std"]) <= 31
     assert a["energy"].mean() > 0.3
     assert a["ink"].max() > 0.005
+
+
+def test_find_videos_primary_final_joins_the_suffixed_formats(review, tmp_path):
+    """Manim/Remotion/motion finals: final.mp4 is the primary format, final_<fmt>.mp4 the others."""
+    (tmp_path / "output").mkdir()
+    make_video(tmp_path / "output" / "final.mp4", size="320x180", dur=1)
+    make_video(tmp_path / "output" / "final_9x16.mp4", size="180x320", dur=1)
+    found = review.find_videos(str(tmp_path))
+    assert set(found) == {"16x9", "9x16"}
+    assert found["16x9"].endswith("final.mp4") and found["9x16"].endswith("final_9x16.mp4")

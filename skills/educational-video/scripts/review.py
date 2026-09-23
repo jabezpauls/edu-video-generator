@@ -2,6 +2,7 @@
 """Build the critique kit for a lesson from its RENDERED mp4s (any engine).
 
     python3 review.py <round> [--project DIR] [--draft] [--video fmt=path ...]
+    python3 review.py <round> <project-dir>             (the project may also be the second argument)
                       [--mode lesson|short] [--grid FILE] [--cues FILE]
 
 Needs numpy and Pillow: use the project venv (`.venv/bin/python review.py ...`, Manim brings both)
@@ -103,12 +104,14 @@ def find_videos(project, draft=False, explicit=None):
             if os.path.isfile(p):
                 found[fmt] = p
                 break
-    if not found and not draft:
+    if not draft:
+        # mux.sh / render.sh name the primary format output/final.mp4 and the others final_<fmt>.mp4: name the
+        # unsuffixed one by its aspect ratio so it joins the others instead of hiding behind them
         for rel in ("output/final.mp4", "final.mp4"):
             p = os.path.join(project, rel)
             if os.path.isfile(p):
                 w, h, *_ = probe(p)
-                found[format_of(w, h)] = p
+                found.setdefault(format_of(w, h), p)
                 break
     return found
 
@@ -654,7 +657,8 @@ def parse_args(argv):
     import argparse
     ap = argparse.ArgumentParser(description="Build the lesson critique kit from rendered mp4s.")
     ap.add_argument("round", nargs="?", default="1")
-    ap.add_argument("--project", default=".", help="project root (default: cwd)")
+    ap.add_argument("project_dir", nargs="?", help="project root, like the other scripts take it (same as --project)")
+    ap.add_argument("--project", default=None, help="project root (default: cwd)")
     ap.add_argument("--draft", action="store_true", help="read draft_<fmt>.mp4 renders")
     ap.add_argument("--video", action="append", default=[], metavar="FMT=PATH",
                     help="use this mp4 for a format instead of discovering one (repeatable)")
@@ -666,7 +670,7 @@ def parse_args(argv):
 
 def main(argv=None):
     a = parse_args(sys.argv[1:] if argv is None else argv)
-    project = os.path.abspath(a.project)
+    project = os.path.abspath(a.project or a.project_dir or ".")
     explicit = {}
     for spec in a.video:
         fmt, _, p = spec.partition("=")

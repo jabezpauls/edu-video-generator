@@ -67,3 +67,10 @@ def test_explicit_video_flag_for_any_engine_layout(tmp_path):
     assert r.returncode == 0, r.stderr
     m = json.loads((tmp_path / "review" / "r1" / "metrics.json").read_text())
     assert m["mode"] == "short" and set(m["formats"]) == {"16x9"}
+
+
+def test_project_can_be_given_as_the_second_argument_like_the_other_scripts(project):
+    r = subprocess.run([sys.executable, str(SCRIPTS / "review.py"), "2", str(project)],
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 0, r.stderr
+    assert (project / "review" / "r2" / "metrics.json").is_file()
