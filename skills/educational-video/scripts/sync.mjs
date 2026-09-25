@@ -83,7 +83,7 @@ const fps = TL.fps || 60;
 const MODE_FORMATS = { lesson: ['16x9'], short: ['9x16'] };
 const sbFormats = storyboard && (Array.isArray(storyboard.formats) && storyboard.formats.length ? storyboard.formats : MODE_FORMATS[storyboard.mode] || null);
 const formats = sbFormats || TL.formats || ['16x9'];
-if (sbFormats && TL.formats && JSON.stringify(TL.formats) !== JSON.stringify(sbFormats)) {
+if (sbFormats && TL.formats && storyboard.scenes?.length && JSON.stringify(TL.formats) !== JSON.stringify(sbFormats)) {
   console.warn(`sync: note: timeline.json formats ${JSON.stringify(TL.formats)} differ from storyboard.json ${JSON.stringify(sbFormats)}; using the storyboard's`);
 }
 const words = [];
