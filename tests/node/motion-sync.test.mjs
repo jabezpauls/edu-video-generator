@@ -61,7 +61,7 @@ test('without narration, storyboard estimates provide scene start and end cues',
   assert.equal(r.status, 0, r.stderr);
   const d = data(dir);
   assert.equal(d.TL.duration, 14, 'duration defaults to the last scene end');
-  assert.deepEqual(d.GRID.cues, { 's01.start': 0, 's01.end': 6, 's02.start': 6, 's02.end': 14 });
+  assert.deepEqual(d.GRID.cues, { 's01.start': 0, 's01.end': 6, 's02.start': 6, 's02.end': 14, 'film.end': 14 });
   assert.equal(d.GRID.nominal, true);
   assert.match(r.stdout, /6\.500s\s+second/);
 });
@@ -117,7 +117,7 @@ test('grid.json scenes and the storyboard fallback use the same s<NN> prefix as 
     'storyboard.json': { scenes: [{ id: 'intro', est_duration_s: 4 }, { id: '2', est_duration_s: 4 }] },
   });
   assert.equal(run(dir).status, 0);
-  assert.deepEqual(Object.keys(data(dir).GRID.cues), ['s01.start', 's01.end', 's02.start', 's02.end']);
+  assert.deepEqual(Object.keys(data(dir).GRID.cues), ['s01.start', 's01.end', 's02.start', 's02.end', 'film.end']);
   const g = project({
     'timeline.json': { marks: { a: 's02.start' } },
     'grid.json': { duration: 8, scenes: [{ id: 'intro', n: 1, start: 0, end: 4 }, { id: '2', n: 2, start: 4, end: 8 }], cues: {} },
@@ -162,4 +162,15 @@ test('without a storyboard the timeline decides the formats; no preset means nul
   assert.deepEqual(d.TL.formats, ['1x1']);
   assert.equal(d.PRESET, null);
   assert.deepEqual(d.GRID.words, []);
+});
+
+test('film.end is the last scene window\'s end, whatever sNN.end (the end of speech) says', () => {
+  const dir = project({
+    'timeline.json': { marks: { last: 'film.end-1' } },
+    'grid.json': { duration: 9, scenes: [{ id: '01', start: 0, end: 9 }], cues: { 's01.end': 8.3 } },
+  });
+  assert.equal(run(dir).status, 0);
+  const d = data(dir);
+  assert.equal(d.GRID.cues['film.end'], 9);
+  assert.equal(d.GRID.cues['s01.end'], 8.3);
 });

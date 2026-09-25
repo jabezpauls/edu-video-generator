@@ -11,6 +11,8 @@
 //   1. storyboard.json, when there is no narration yet: sNN.start / sNN.end from the cumulative est_duration_s
 //   2. grid.json (written by grid.py) { duration?, scenes: [{ id, n?, start, end, words? }], cues: { "s03.derivative": 12.31, ... } }
 // so a film written against 's02.start' or 's02.derivative' keeps working when real speech replaces the estimates.
+// film.end (always): the film's duration. A scene runs from sNN.start to the next scene's start (the last one to film.end);
+// sNN.end is where the speech stops, before the tail, so it is for anchoring a visual, not for a scene window.
 // The spoken words of every scene also become window.GRID.words ([{ w, t, e }] in seconds): the burned-in captions read them.
 //
 // Formats come from the storyboard (`formats`, else the default of its `mode`); timeline.json's own `formats` is only used
@@ -78,6 +80,7 @@ if (grid) {
 const lastEnd = Math.max(0, ...Object.entries(cues).filter(([k]) => k.endsWith('.end')).map(([, v]) => v));
 const duration = TL.duration ?? grid?.duration ?? (lastEnd > 0 ? lastEnd : null);
 if (!(duration > 0)) fail('no duration: set "duration" in timeline.json (or provide storyboard est_duration_s / grid.json)');
+cues['film.end'] = duration;          // the last scene's window ends here (sNN.end is the end of the SPEECH, before the tail)
 const fps = TL.fps || 60;
 // the storyboard is the contract for what gets rendered; a mode's default applies when it lists nothing
 const MODE_FORMATS = { lesson: ['16x9'], short: ['9x16'] };
