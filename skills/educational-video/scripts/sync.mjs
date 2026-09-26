@@ -122,14 +122,19 @@ const sfx = events.filter((e) => e.t < duration).sort((a, b) => a.t - b.t).map((
 }));
 
 // ------------------------------------------------------------------ write
-// cues.json is shared with `grid.py cues` (same shape, tagged by "source"). A plan derived from storyboard beats
-// by grid.py is kept unless the timeline declares its own sfx, which then win because they are placed on the film's marks.
-let keepGridPlan = false;
+// cues.json is shared with `grid.py cues` (same shape, tagged by "source"). The timeline's sfx are written only when it
+// declares some, and they win over a grid.py plan because they sit on the film's marks. With none declared sync writes
+// nothing, leaves a grid.py plan alone and removes a stale timeline-made file, so `grid.py cues` is never blocked by us.
 const cuesPath = path.join(ROOT, 'cues.json');
-if (fs.existsSync(cuesPath) && !(TL.sfx || []).length) {
-  try { keepGridPlan = JSON.parse(fs.readFileSync(cuesPath, 'utf8')).source === 'grid'; } catch { /* unreadable: rewrite */ }
+const declared = (TL.sfx || []).length > 0;
+let keepGridPlan = false;
+if (declared) fs.writeFileSync(cuesPath, JSON.stringify({ sr: 48000, duration, source: 'timeline', cues: sfx }, null, 1) + '\n');
+else if (fs.existsSync(cuesPath)) {
+  let src = null;
+  try { src = JSON.parse(fs.readFileSync(cuesPath, 'utf8')).source; } catch { /* unreadable: leave it */ }
+  if (src === 'grid') keepGridPlan = true;
+  else if (src === 'timeline') fs.rmSync(cuesPath);
 }
-if (!keepGridPlan) fs.writeFileSync(cuesPath, JSON.stringify({ sr: 48000, duration, source: 'timeline', cues: sfx }, null, 1) + '\n');
 fs.mkdirSync(path.join(ROOT, 'film'), { recursive: true });
 const dataGrid = { cues, scenes: sceneIds, nominal: !grid, words };
 fs.writeFileSync(path.join(ROOT, 'film/data.js'),
@@ -139,6 +144,6 @@ if (!QUIET) {
   const src = grid ? `grid.json (${Object.keys(grid.cues || {}).length} cues)` : storyboard && sceneIds.length ? `storyboard estimates (${sceneIds.length} scenes, no narration grid yet)` : 'none';
   console.log(`time: seconds · duration ${duration}s @ ${fps} fps · formats ${formats.join(', ')} · cue grid: ${src}${words.length ? ` · ${words.length} caption words` : ''}${preset ? ` · preset ${preset.name}` : ''}${beats ? ' · beat grid: yes' : ''}`);
   for (const [k, t] of Object.entries(marks).sort((a, b) => a[1] - b[1])) console.log(`  ${t.toFixed(3).padStart(8)}s  ${k}`);
-  console.log(keepGridPlan ? 'cues.json: kept the grid.py plan (timeline declares no sfx) · film/data.js written' : `cues.json: ${sfx.length} sfx cues · film/data.js written`);
+  console.log(`${declared ? `cues.json: ${sfx.length} sfx cues from the timeline` : keepGridPlan ? 'cues.json: kept the grid.py plan (timeline declares no sfx)' : 'no timeline sfx'} · film/data.js written`);
 }
 for (const [k, t] of late) console.warn(`sync: warning: mark "${k}" is at ${t.toFixed(2)}s, outside the film (0-${duration}s)`);

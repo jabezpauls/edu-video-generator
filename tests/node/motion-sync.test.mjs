@@ -174,3 +174,12 @@ test('film.end is the last scene window\'s end, whatever sNN.end (the end of spe
   assert.equal(d.GRID.cues['film.end'], 9);
   assert.equal(d.GRID.cues['s01.end'], 8.3);
 });
+
+test('no declared sfx: no cues.json is written and a stale timeline-made one is removed', () => {
+  const dir = project({ 'timeline.json': { duration: 5 } });
+  assert.equal(run(dir).status, 0);
+  assert.equal(existsSync(join(dir, 'cues.json')), false);
+  writeFileSync(join(dir, 'cues.json'), JSON.stringify({ source: 'timeline', cues: [{ t: 1, type: 'pop' }] }));
+  assert.equal(run(dir).status, 0);
+  assert.equal(existsSync(join(dir, 'cues.json')), false, 'its sfx were deleted from the timeline');
+});
