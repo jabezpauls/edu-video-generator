@@ -63,3 +63,15 @@ def test_a_lesson_is_not_held_to_the_hook_rules(validator, short):
     short["scenes"][0]["narration"] = "word " * 40
     short["scenes"][0]["beats"] = []
     assert validator.check(short)[0] == []
+
+
+def test_manifest_follows_the_storyboard(validator, short, tmp_path):
+    (tmp_path / "storyboard.json").write_text(json.dumps(short))
+    (tmp_path / "manifest.json").write_text(json.dumps({"slug": "x", "mode": "lesson", "formats": ["16x9"],
+                                                        "engine": None, "preset": None, "phase": "intake"}))
+    import subprocess, sys
+    r = subprocess.run([sys.executable, str(SKILL / "scripts" / "validate_storyboard.py"), str(tmp_path), "--manifest"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    m = json.loads((tmp_path / "manifest.json").read_text())
+    assert (m["mode"], m["formats"], m["engine"], m["phase"]) == ("short", ["9x16"], "motion", "intake")

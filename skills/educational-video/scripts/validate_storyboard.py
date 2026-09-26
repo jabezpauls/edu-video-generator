@@ -4,7 +4,9 @@
 Pure-stdlib structural check (no extra install needed). The checks are exposed as
 functions (`check`, `manual_check`) so they can be unit-tested and reused.
 
-Usage: validate_storyboard.py <project-dir>
+Usage: validate_storyboard.py <project-dir> [--manifest]
+  --manifest  when valid, copy engine, mode, formats and preset into manifest.json, so the run state
+              never disagrees with the approved storyboard (the storyboard is the source of truth)
 """
 import json
 import os
@@ -222,8 +224,26 @@ def manual_check(sb) -> list:
     return check(sb)[0]
 
 
+def sync_manifest(project, sb) -> bool:
+    """Copy the storyboard's engine/mode/formats/preset into manifest.json (when there is one)."""
+    path = os.path.join(project, "manifest.json")
+    if not os.path.isfile(path):
+        return False
+    with open(path) as f:
+        m = json.load(f)
+    eff = effective(sb)
+    m.update({"engine": sb.get("engine"), "mode": eff["mode"], "formats": eff["formats"], "preset": eff["preset"]})
+    if sb.get("engine_reason"):
+        m["engine_reason"] = sb["engine_reason"]
+    with open(path, "w") as f:
+        json.dump(m, f, indent=2)
+        f.write("\n")
+    return True
+
+
 def main() -> int:
-    project = sys.argv[1] if len(sys.argv) > 1 else "."
+    args = [a for a in sys.argv[1:] if a != "--manifest"]
+    project = args[0] if args else "."
     path = os.path.join(project, "storyboard.json")
     if not os.path.isfile(path):
         print(f"not found: {path}", file=sys.stderr)
@@ -244,6 +264,8 @@ def main() -> int:
     print(f"storyboard OK: {len(sb['scenes'])} scenes, ~{total:.0f}s, "
           f"engine={sb.get('engine')}, mode={eff['mode']}, "
           f"formats={','.join(eff['formats'])}")
+    if "--manifest" in sys.argv[1:] and sync_manifest(project, sb):
+        print("manifest.json updated (engine, mode, formats, preset)")
     return 0
 
 
