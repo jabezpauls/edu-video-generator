@@ -93,7 +93,14 @@ const f = useFormat(SAFE_AREA);              // SAFE_AREA comes from the preset'
 ## Subtitles per format
 
 Soft subtitles (mov_text) for 16x9, 1x1 and 4x5; burned in for 9x16, where players do not
-show a subtitle track. Burned captions respect the bottom safe area.
+show a subtitle track. Burned captions respect the bottom safe area. Manim and Remotion: `mux.sh` burns
+`subtitles_9x16.ass`. Motion: the film draws word-synced captions itself (nothing to write).
+
+## Output names
+
+`final.mp4` is the first format of the storyboard, `final_<fmt>.mp4` every other one (same for all
+engines; `mux.sh <p> --format all`, `render.sh motion <p> all high`). Motion also leaves the raw renders in
+`renders/<fmt>.mp4`. `review.py` finds both.
 
 ## Motion engine
 

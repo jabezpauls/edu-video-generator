@@ -1,8 +1,8 @@
 # Lesson critic prompt
 
 Hand this file to a fresh critic: a subagent that did NOT write the lesson. Give it the project
-path and the round number. If no subagent is available, run it yourself and keep the critic's
-voice: evidence first, no defending the code. It works for every engine because it judges only
+path and the round number. If you cannot spawn one, play the critic yourself from the rendered kit alone (Read every
+sheet): evidence first, no defending the code, no reading the film's source to excuse a problem. It works for every engine because it judges only
 the rendered MP4s.
 
 ---

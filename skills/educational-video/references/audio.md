@@ -149,6 +149,19 @@ the mix is the only audio track, so loudness is guaranteed.
 Engines read the grid with `templates/gridsync.py` (Manim) and `templates/gridsync.ts` (Remotion);
 see `manim-patterns.md` and `remotion-patterns.md`.
 
+Formats: `mux.sh <p> --format all` assembles every format of the storyboard (`final.mp4` is the first,
+`final_<fmt>.mp4` the others); 9x16 always gets `subtitles_9x16.ass` burned in, the rest a soft track. The scene
+videos it reads are `scene_<id>.<fmt>.mp4` (`render.sh <engine> <p> all <q> all`).
+
+Motion lessons need no mux step: they are one film, so `render.sh motion <p> all high` writes
+`output/final*.mp4` with `audio/mix.wav` (and the soft `output/subtitles.srt` for non-9x16 formats) already in
+them. `render.mjs --mux` re-attaches a new mix to existing renders without re-rendering the picture. Cue names
+(`s03.three`) are the same in the film, in `grid.json` and in the storyboard's `on` anchors.
+
+Presets feed this chain: the voice (`tts.py`), the music mood and level (`music.py`, `mix.py`) and whether
+sound effects are on (`mix.py`) come from the applied preset (`preset.json`) when you do not say otherwise.
+Apply the preset before narration. A short defaults to the `upbeat` bed.
+
 ## 6. Checking sync
 
 Pick three anchored beats and compare the frame where the visual starts with the cue time:

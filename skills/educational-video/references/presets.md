@@ -94,9 +94,26 @@ holds the render until they are ready, so no frame is drawn in a fallback face.
 
 ### Motion engine
 
-The motion engine reads `preset.jsonc` (or the resolved `preset.json`) directly: `colors`
-become its `:root` tokens, `fonts.display` / `fonts.body` its two faces. Same field names, same
-ids.
+`apply_preset.py` writes `preset.json` and `assets/fonts/{display,body}.woff2` (no `scenes/` theme files, no
+`.ttf`), `sync.mjs` hands the preset to the film as `window.PRESET`, and `core.js` applies it when the film starts:
+
+| preset | motion engine |
+|---|---|
+| `colors.bg ink ink2 accent card` | `--bg --ink --ink-2 --accent --card` |
+| `colors.highlight` | `--hi` (the engine's name for the highlight hue) |
+| `fonts.display` | the `Display` face, `--font-display`; `tracking` becomes `--display-tracking` |
+| `fonts.body` | the `UI` face, `--font-ui` (and its alias `--font-body`) |
+| `captions.style` / `active_word` | burned-in caption style (`pill`, `plain`, `outline`) and the spoken-word colour |
+
+`render.sh motion` applies the storyboard's `preset` by itself when it differs from what the project has. The
+`safe_area` and `cards` fields are for the scene author (Manim and Remotion expose `SAFE_AREA` and `CARDS`);
+the motion engine's zones always use the standard safe areas.
+
+## Beyond looks
+
+`voice` picks the TTS voice for the provider in use (a Piper voice must be downloaded into `assets/tts/`, otherwise
+`tts.py` warns and keeps the default), `music.mood` / `music.level_db` and `sfx.enabled` / `sfx.level_db` set the
+bed and the sound-effect level in `music.py` and `mix.py`. Command-line flags and `mix.json` still win.
 
 ## What a preset does not change
 
