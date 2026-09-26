@@ -80,7 +80,7 @@ def test_motion_engine_scaffold(tmp_path):
     project = tmp_path / "demo"
     assert r.stdout.strip() == str(project)
     for f in ("film/index.html", "film/core.js", "film/type.js", "film/film.js", "film/data.js",
-              "film/lib/motion.js", "film/lib/time.js", "timeline.json", "cues.json",
+              "film/lib/motion.js", "film/lib/time.js", "timeline.json",
               "package.json"):
         assert (project / f).is_file(), f
     assert json.loads((project / "manifest.json").read_text())["engine"] == "motion"

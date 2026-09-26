@@ -37,7 +37,8 @@ for (const base of [path.join(ROOT, 'package.json'), path.join(process.cwd(), 'p
 }
 if (!chromium) die(`playwright not found from ${ROOT}. Run: (cd ${ROOT} && npm i -D playwright && npx playwright install chromium)`);
 
-const TL = JSON.parse(fs.readFileSync(path.join(ROOT, 'timeline.json'), 'utf8'));
+// the effective timeline (storyboard formats, narration duration) is what sync.mjs wrote into data.js, not timeline.json itself
+const TL = JSON.parse(/^window\.TL = (.*);$/m.exec(fs.readFileSync(path.join(ROOT, 'film/data.js'), 'utf8'))[1]);
 const SIZES = { '16x9': [1920, 1080], '1x1': [1080, 1080], '4x5': [1080, 1350], '9x16': [1080, 1920] };
 const ALL = TL.formats || ['16x9'];
 const FORMATS = has('all') ? ALL : [opt('fmt', ALL[0])];
@@ -114,7 +115,7 @@ async function openFilm(fmt) {
   await page.goto(`http://127.0.0.1:${server.address().port}/film/index.html?fmt=${fmt}`);
   // a script error (unknown cue, typo in film.js) means window.READY never exists: fail with the message, not a timeout
   const ready = await Promise.race([
-    page.waitForFunction(() => window.READY, null, { timeout: 120000 }).then(() => page.evaluate(() => window.READY)),
+    page.waitForFunction(() => window.READY, null, { timeout: 120000 }).then(() => page.evaluate(() => window.READY)).catch((e) => { errors.push(String(e.message).split('\n')[0]); return false; }),
     new Promise((r) => { const i = setInterval(() => { if (errors.length) { clearInterval(i); r(false); } }, 50); }),
   ]);
   if (!ready || errors.length) { console.error(`render: the film failed to load (${fmt}):\n  ${errors.join('\n  ') || 'READY never resolved'}`); await quit(1); }
