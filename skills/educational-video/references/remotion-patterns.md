@@ -118,7 +118,7 @@ element in `<Sequence from={Math.round(t*fps)}>`. Actions: `fade_in→interpolat
 ## Duration and word sync (read the grid)
 
 A scene's length is its grid slot, and its beats are the grid's word times (see `audio.md`).
-Copy `templates/gridsync.ts` to `scenes/src/gridsync.ts`:
+`scenes/src/gridsync.ts` is put there by `scaffold_engine.sh` (bootstrap runs it):
 
 ```tsx
 import { AbsoluteFill, interpolate, Easing } from "remotion";

@@ -13,12 +13,13 @@ def test_manim_scaffold_copies_helpers(tmp_path):
     assert r.returncode == 0, r.stderr
     assert (tmp_path / "scenes" / "springs.py").is_file()
     assert (tmp_path / "scenes" / "formats.py").is_file()
+    assert (tmp_path / "scenes" / "gridsync.py").is_file()
 
 
 def test_remotion_scaffold_copies_helpers(tmp_path):
     r = run(str(tmp_path), "remotion")
     assert r.returncode == 0, r.stderr
-    for f in ("springs.ts", "formats.ts", "SceneFormats.tsx"):
+    for f in ("springs.ts", "formats.ts", "SceneFormats.tsx", "gridsync.ts"):
         assert (tmp_path / "scenes" / "src" / f).is_file()
 
 

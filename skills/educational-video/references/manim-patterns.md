@@ -111,8 +111,8 @@ Prevent overlap: build groups with `.arrange()` and `buff`; never hard-code over
 
 ## Timing to match narration (read the grid)
 
-Scene length and beat times come from `grid.json` (see `audio.md`), never from guesses. Copy
-`templates/gridsync.py` to `scenes/gridsync.py` and subclass `GridScene`:
+Scene length and beat times come from `grid.json` (see `audio.md`), never from guesses. `scenes/gridsync.py` (put there by
+`scaffold_engine.sh`, which bootstrap runs) provides `GridScene`; subclass it:
 
 ```python
 from manim import *

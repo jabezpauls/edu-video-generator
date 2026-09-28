@@ -146,7 +146,7 @@ relying on it), concatenates the scenes, and muxes `audio/mix.wav`. Subtitles ar
 by default, `--burn` hardcodes `subtitles.ass`. Do not add audio inside Manim or Remotion scenes:
 the mix is the only audio track, so loudness is guaranteed.
 
-Engines read the grid with `templates/gridsync.py` (Manim) and `templates/gridsync.ts` (Remotion);
+Engines read the grid with `scenes/gridsync.py` (Manim) and `scenes/src/gridsync.ts` (Remotion), copied from `templates/`;
 see `manim-patterns.md` and `remotion-patterns.md`.
 
 Formats: `mux.sh <p> --format all` assembles every format of the storyboard (`final.mp4` is the first,
