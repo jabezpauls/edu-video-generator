@@ -2,178 +2,190 @@
 name: educational-video
 description: >-
   Use when the user wants to create, generate, or produce an educational or explainer
-  video, animated lesson, math/physics/CS visualization, algorithm or data-structure
-  walkthrough, tutorial or lecture clip, or narrated whiteboard-style explainer — including
-  asks like "make a video explaining X", "animate this concept", "turn this script/lesson
-  into a video", "Manim video", "Remotion video", "3Blue1Brown-style animation", or any
-  request for a rendered MP4 that teaches a topic with visuals plus voiceover and subtitles,
-  including spring-animated concept explainers, algorithm walkthroughs and kinetic-type lessons.
-  Also use when the user wants to add narration, TTS voiceover, or word-aligned captions to
-  a generated animation.
+  video, animated lesson, short (30-60 s vertical micro-lesson, Reel, TikTok, YouTube
+  Short), math/physics/CS visualization, algorithm or data-structure walkthrough, tutorial
+  or lecture clip, or narrated whiteboard-style explainer — including asks like "make a
+  video explaining X", "animate this concept", "turn this script/lesson into a video",
+  "make a short about X", "Manim video", "Remotion video", "3Blue1Brown-style animation",
+  or any request for a rendered MP4 that teaches a topic with visuals, voiceover, music and
+  captions. Also use when the user wants to add narration, TTS voiceover, sound, or
+  word-synced captions to a generated animation, or a 9:16 version of a lesson.
 ---
 
 # Educational Video Generator
 
-Generate high-quality, consistent educational videos by **writing and rendering code**, not
-by synthesizing pixels. Diffusion/text-to-video models (Sora, Veo, Runway, Kling) cannot
-hold logical, numeric, or textual rigor and score poorly on educational content. The reliable
-approach is **code-driven + agentic**: a Planner writes a storyboard, a Coder writes Manim
-(Python), Remotion (React/TSX) or motion-engine (seek(t) HTML/JS) code, a renderer executes it, and a vision Critic inspects
-the rendered frames and drives fixes — looping until each scene passes.
+Produce a polished, correct, narrated lesson (and, on request, a vertical short) by **writing
+and rendering code**, never by synthesizing pixels: text-to-video models cannot hold
+equations, numbers or text. The pipeline is a storyboard, one narration clock, code in one of
+three engines, a render loop that checks the frames, a sound mix, and a scored critic that
+decides when it ships.
 
-## Operating principle
+Engines: **Manim** (Python, math and geometry), **Remotion** (React, UI/data/branded),
+**motion** (spring-driven `seek(t)` HTML engine: concept explainers, algorithm stepping,
+kinetic type, shorts). Same storyboard, same narration grid, same sound and critic for all.
 
-You (Claude Code) play three roles across the pipeline. Switch deliberately and say which hat
-you're wearing:
+`$SKILL` below is this skill's directory (`~/.claude/skills/educational-video`), `$P` the run's
+project folder, `$PY` is `$P/.venv/bin/python` (bootstrap creates it with numpy, Pillow,
+Piper). Read `$P/manifest.json` first when it exists and skip phases already done.
 
-- **Planner** — turns the topic/script into a schema-valid `storyboard.json`.
-- **Coder** — turns each storyboard scene into executable, *debuggable* engine code, grounded
-  in `references/manim-patterns.md` / `references/remotion-patterns.md` (read the relevant
-  patterns / `references/motion-engine.md` BEFORE writing code — this doc-grounding is what raises render success to ~94%).
-- **Critic** — reads rendered frames as images and judges layout, legibility, timing.
+## Roles and loops
 
-Two agentic loops do the heavy lifting (full spec in `references/verify-loop.md`):
-1. **RITL** (Renderer-in-the-Loop): render → on error, retrieve the failing-symbol doc snippet,
-   patch minimally, re-render. Max **5** render-error retries per scene → hard fail, escalate.
-2. **Vision critic**: extract beat frames → Read() them → fix issues → re-render. Max **3**
-   critic-fix passes per scene → soft fail, warn and continue.
+You wear three hats; say which:
+- **Planner**: topic or script to a valid `storyboard.json`.
+- **Coder**: storyboard to engine code, grounded in the references (read the patterns doc
+  BEFORE coding; this is what keeps render failures rare).
+- **Critic**: reads rendered frames and judges. For the scored critic (phase 8) be a fresh,
+  strict one, never the author defending the code.
 
-Global guardrail: cap cumulative re-renders at **40 per run**; if hit, deliver best-effort and
-report. Keep `manifest.json` updated after every phase so a re-invocation resumes mid-pipeline.
+Loops (details: `references/verify-loop.md`): **RITL** per scene (render, on error read the
+log and fix minimally, at most 5 tries); **frame check** per scene (Read the frames, at most 3
+fix passes); **scored critic** on the whole lesson (phase 8). At most 40 re-renders per run;
+past that, deliver the best version and say so. Update `manifest.json` after every phase.
 
-## Phase pipeline
+## The pipeline
 
-Work through these in order. Read `manifest.json` first; skip any phase already marked done.
+### 0. Intake
+Capture topic or script, audience, target duration, **mode** (`lesson` or `short`: a short is
+30-60 s, 9:16), **formats** (`16x9` default for a lesson, `9x16` for a short; also `1x1`,
+`4x5`), **preset** (`chalkboard`, `paper`, `blueprint` or none: `references/presets.md`),
+narration on or off and a voice or language, and whether the user wants speed (`--quick`) or
+the strict critic. Ask at most 2-3 questions, propose defaults for the rest, go on. If asked
+for "a lesson and a short", that is two projects sharing a preset; do the lesson first.
 
-### Phase 0 — Intake
-Capture: topic (or supplied script), target duration, audience level, aspect ratio
-(default **16:9, 1920x1080, 30fps**), narration on/off, voice/language. Ask at most **2–3**
-clarifying questions, then proceed. If the user gave a script, ingest it; if only a topic, the
-Planner writes the script in Phase 3.
+### 1. Bootstrap
+```bash
+$SKILL/scripts/new_project.sh <base> <slug> [manim|remotion|motion] [--short]   # prints $P
+$SKILL/scripts/bootstrap.sh $P <engine|auto>      # venv, engine deps, Piper + voice, Chromium for motion
+$SKILL/scripts/detect_tts.py $P                   # provider written to .videogen/env.json by bootstrap
+```
+Everything is idempotent. Manim runs in a uv-managed Python 3.12 venv (never system Python:
+3.14 breaks it). `--short` seeds the 9:16 short storyboard template and picks motion. If the chosen
+engine will not install, switch engines, record why in `manifest.json` `warnings`, continue.
+Failures: `references/troubleshooting.md`.
 
-### Phase 1 — Bootstrap (idempotent)
-Run `scripts/bootstrap.sh <project-dir> <engine|auto>`. It detects what's present and installs
-only what's missing: a **uv-managed Python 3.12 venv** (never system Python — Manim breaks on
-3.14), Manim, a Remotion scaffold, and TTS. With `auto` it only probes node + ffmpeg for the
-motion engine; once the engine is chosen, `bootstrap.sh <project-dir> motion` scaffolds `film/`
-and `timeline.json` and installs Playwright + Chromium (`new_project.sh <base> <slug> motion`
-does the file scaffold alone). Then run `scripts/detect_tts.py` and write results
-to `<project>/.videogen/env.json`. If Manim install fails, set engine=remotion in the manifest
-with the reason and continue. See `references/troubleshooting.md` for failures.
+### 2. Engine selection
+Score the content: math/geometric rigor (Manim), web/UI/design/data (Remotion), concept
+explainer, algorithm stepping, kinetic type, short (motion). Highest wins; STEM ties go to
+Manim; `mode: short` defaults to motion; the user's choice always wins. Write `engine` and
+`engine_reason` into the storyboard. See `references/engine-selection.md`.
 
-### Phase 2 — Engine selection
-Score the content on three axes: **math/geometric/numeric rigor** (→ Manim), **web/text/design/UI**
-(→ Remotion) and **concept explainer / algorithm stepping / kinetic type / Shorts** (→ **motion**,
-the spring-driven seek(t) engine). Highest wins. Tie-break: STEM → **Manim**, else **Remotion**. Write `engine` + `engine_reason` to the
-manifest. The user may override. Heuristics: `references/engine-selection.md`.
+### 3. Storyboard, then STOP
+Write `$P/storyboard.json` (`references/storyboard-schema.md`; shorts: start from
+`templates/short.storyboard.json` and follow `references/shorts.md`): per scene `narration`
+(speakable words, no LaTeX), `elements`, `beats` anchored with `t` or `on` (a spoken word),
+`est_duration_s`. Set `mode`, `formats`, `preset`. Then:
+```bash
+python3 $SKILL/scripts/validate_storyboard.py $P --manifest   # fix until it passes; also syncs manifest.json
+```
+Total duration within 15 % of target. **Stop here and show the user the plan** (scene list,
+narration, formats, preset, engine, estimated length) and wait for approval. A changed
+storyboard after approval means telling the user, not silently diverging.
 
-### Phase 3 — Plan / storyboard (Planner)
-Create `storyboard.json` per `references/storyboard-schema.md`: decompose into scenes, each with
-`narration`, `elements`, animation `beats` (timestamps via `t`, or anchored to a spoken word
-via `on`), `est_duration_s`, `template`, `assets`. Set `mode`, `formats` and `preset` only when
-the user asked for them; the defaults are a 16x9 lesson. Validate with `scripts/validate_storyboard.py`; fix until it passes. Summed scene
-durations must be within **±15%** of target.
+### 4. Narration first
+Speech is the clock; do this before writing any scene code, and again after any script change.
+```bash
+python3 $SKILL/scripts/apply_preset.py <preset> $P      # if the storyboard has a preset (voice, music, looks follow it)
+$PY $SKILL/scripts/tts.py $P                            # audio/scene_<id>.wav (ElevenLabs/OpenAI key set, else Piper)
+$PY $SKILL/scripts/grid.py $P --write-durations         # grid.json: word times, scene slots from real speech, named cues
+$PY $SKILL/scripts/grid.py resolve $P                   # beat `on` anchors to seconds (beats.resolved.json)
+```
+Scenes now last exactly as long as their speech plus a 0.4 s lead-in and 0.6 s tail, and the
+storyboard's durations are updated. Cue names (`s03.derivative`, `s03.p2`, `s03.start`) are
+what the code is written against. `references/audio.md`, `references/tts-setup.md`.
+No narration (`"narration": false`): skip this and phase 7's speech, keep `est_duration_s`.
 
-### Phase 4 — Generate code (Coder)
-With narration on, do Phase 7 first so scene lengths and `on` anchors come from `grid.json`.
-For each scene, FIRST read the matching patterns + component templates
-(`references/component-library.md`), THEN write code. Prefer instantiating templates
-(TitleCard, BulletList, EquationReveal, CodeBlock, DataChart, LowerThird, SceneTransition) over
-raw animation — templates encode safe-area margins, font sizes, and a consistent palette, which
-prevents most critic failures.
-- Manim → `scenes/scene_<id>.py` (one `Scene` subclass per storyboard scene).
-- Remotion → `scenes/Scene<Id>.tsx`, registered in `src/Root.tsx`.
-- Manim and Remotion get `springs`, `formats` and a preset `theme` in the project (`scripts/scaffold_engine.sh`,
-  run by bootstrap; `scripts/apply_preset.py` re-applies a preset). Use them for motion, layout
-  per format and colours/fonts: `references/formats.md`, `references/presets.md`.
-- Motion → ONE film: `film/film.js` (a `scene()` per storyboard scene, named `s<id>`) plus the marks in
-  `timeline.json`. Read `references/motion-engine.md` (API, time source) and `references/motion-rules.md`
-  (springs only, determinism, lesson rhythm) first. Place things on marks/cues, not hard-coded seconds.
+### 5. Code
+For each scene read the matching reference first, then write code that places things on
+cues, not hard-coded seconds:
+- **Manim**: `scenes/scene_<id>.py`; `references/manim-patterns.md`. `springs.py`, `formats.py`,
+  `theme.py` and `gridsync.py` are in `scenes/` (bootstrap/`scaffold_engine.sh`).
+- **Remotion**: `scenes/src/Scene<Id>.tsx` registered with `<SceneFormats>` in `Root.tsx`;
+  `references/remotion-patterns.md`.
+- **Motion**: ONE film, `film/film.js`, a `scene({ name: 's<id>', from: 's<id>.start',
+  to: 's<next>.start' })` per storyboard scene (the last one ends at `film.end`), built from
+  `EDU.equation / code / plot / diagram` and `TYPE`. Read `references/motion-engine.md`,
+  `references/motion-rules.md`, `references/motion-components.md`. Springs only, nothing
+  stateful, re-block with `C.pick(wide, square, tall)`, content in `EDU.zone(...)` boxes.
+  Captions are automatic. Replace the starter lesson and its `timeline.json` marks.
+Templates for common scenes: `references/component-library.md`. Layout per format:
+`references/formats.md`.
 
-### Phase 5 — Render
-Render per scene first (fast iteration): `scripts/render.sh <engine> <project> <scene> <quality>`
-(use medium quality while iterating, high for the final pass). For Manim and Remotion add a format
-(`16x9`, `1x1`, `4x5`, `9x16`, or `all` for every format in the storyboard) as a fifth argument to
-render per format. Capture exit code + stderr to
-`.videogen/logs/scene_<id>.render.log`. For `motion`, `render.sh motion <project> <id|all>
-low|med|high` delegates to `scripts/render.mjs` (after re-syncing `timeline.json`); contact sheets
-(`render.mjs --project <p> --sheet [--fmt 9x16]`) and stills (`--at 1.2,3.4`) are painted directly
-from `seek(t)` in seconds, so use them for the first look before any video.
+### 6. Render loop
+- **Motion**: look before rendering video. `node $SKILL/scripts/render.mjs --project $P
+  --sheet --every 1.5 [--fmt 9x16]` writes labelled contact sheets (plus `_phone` ones); Read
+  them, fix, repeat (`--at 12.3` for single stills). `render.sh motion $P all verify` must
+  report every probe identical in every format.
+- **Manim/Remotion**: `$SKILL/scripts/render.sh <engine> $P <id|all> <low|med|high> [format|all]`;
+  frames with `extract_frames.sh`. Logs land in `.videogen/logs/`.
+Apply `references/verify-loop.md`: RITL on errors, frame check on the output (overlap,
+off-screen, legibility, composition, beat timing). Record retries in the manifest.
 
-### Phase 6 — Verify (core loop, per scene)
-Apply `references/verify-loop.md`:
-1. **RITL**: if render exit ≠ 0, parse the error, retrieve the relevant doc snippet for the
-   failing symbol, apply a minimal patch, re-render (≤5). On exhaustion, escalate with the log.
-2. **Vision critic**: extract beat frames via `scripts/extract_frames.sh`, Read() each as an
-   image, evaluate the rubric (overlap / off-screen safe-area / legibility incl. LaTeX rendered
-   / composition / beat-timing). On FIX, give the Coder targeted instructions, re-render,
-   re-critique (≤3). PASS = exit 0 AND critic PASS.
-3. **Scored critic (after Phase 9, on the final MP4s)**: `scripts/review.py <round>` builds the
-   critique kit, then a FRESH critic subagent scores 8 criteria using `references/critique.md`
-   and appends to `docs/review_log.md`. Strict default: at least 3 rounds, ship when every score
-   is ≥ 8. `--quick` (user asked for fast/draft): 1 round, ship at every score ≥ 7. After each
-   round set `critic_rounds`, `scores` (latest round) and `critic_mode` in the manifest, fix the
-   3 worst problems, re-render and repeat. Details: `references/verify-loop.md` §6.
+### 7. Sound
+```bash
+$PY $SKILL/scripts/align_subtitles.py $P                # output/subtitles.srt, .ass, subtitles_9x16.ass
+$PY $SKILL/scripts/grid.py cues $P                      # sfx plan from the beats (cues.json)
+node $SKILL/scripts/sfx.mjs $P                          # audio/sfx.wav (pop, tick, whoosh, chime, thump on the cues)
+$PY $SKILL/scripts/music.py $P                          # quiet bed; mood from the preset (upbeat for shorts), --mood none to skip
+$PY $SKILL/scripts/mix.py $P                            # audio/mix.wav: ducked, -14 LUFS, true peak <= -1 dBTP
+```
+Read the printed loudness; `mix_report.json` has it. Off target (exit 2) means a stem is too
+hot; lower it (`mix.json`) and rerun. A motion film that places its own sound effects
+declares `sfx` in `timeline.json` instead of running `grid.py cues`.
 
-### Phase 7 — Narration / TTS → narration grid
-Narration is the clock. If narration is on, run it as soon as the storyboard is approved (before
-coding scenes) and re-run after any script change:
-`scripts/tts.py <project>` (per-scene audio from each scene's `narration`; cloud provider if a key
-is set, else local Piper), then `scripts/grid.py <project> --write-durations` (word times, scene
-slots from real speech, named cues in `grid.json`) and `scripts/grid.py resolve <project>`
-(beat `on` anchors → times). Scenes read the grid with `templates/gridsync.py` (Manim) or
-`templates/gridsync.ts` (Remotion), so animations land on their words and scenes are exactly as
-long as their speech. See `references/tts-setup.md` and `references/audio.md`.
+### 8. Critique rounds
+Render the assembled lesson in every format, then build the kit and be the critic:
+- **Motion**: `render.sh motion $P all low` (drafts with the mix in `renders/draft_<fmt>.mp4`) and
+  `$PY $SKILL/scripts/review.py <N> $P --draft`; the shipping round uses the finals (phase 9).
+- **Manim/Remotion**: `mux.sh $P --format all`, then `$PY $SKILL/scripts/review.py <N> $P`.
+Then follow `references/critique.md`: a FRESH critic (a subagent if you can spawn one; otherwise
+play it yourself strictly from the kit, Read every sheet, never from the code) scores the 8
+criteria 1-10 with evidence, applies the automatic caps, appends the round to
+`docs/review_log.md` and says SHIP or ANOTHER ROUND.
+- **Strict (default)**: at least 3 rounds, ship when every score is >= 8 in round 3 or later.
+- **`--quick`** (the user asked for fast or a draft): 1 round, ship when every score is >= 7.
+After every round set `critic_mode`, `critic_rounds` and `scores` in the manifest, fix the 3
+worst problems (smallest edit, back through phase 6), re-render, go again. Never argue a
+score up; fix the picture. Six strict rounds maximum, then deliver the best round and list
+what is outstanding in `warnings`.
 
-### Phase 8 — Subtitles and sound
-`scripts/align_subtitles.py <project>` → `output/subtitles.srt` + `.ass` from the grid.
-Then `scripts/grid.py cues <project>` and `node scripts/sfx.mjs <project>` (sound effects on
-cues), `scripts/music.py <project> --mood curious|calm|upbeat|none` (bed), and
-`scripts/mix.py <project>` (ducked, mastered to -14 LUFS, TP ≤ -1 dBTP → `audio/mix.wav`).
+### 9. Finals
+- **Motion**: `render.sh motion $P all high` (60 fps, motion blur, mix and subtitles inside).
+  `output/final.mp4` is the first format, `output/final_<fmt>.mp4` the others.
+- **Manim/Remotion**: `render.sh <engine> $P all high all`, then `mux.sh $P --format all`
+  (conforms scenes to the grid, adds `mix.wav`; soft subtitles, burned captions for 9x16).
+  If it warns a scene is shorter or longer than its slot, fix the animation, do not rely on the hold.
+Check: `ffprobe` durations agree across formats; loudness of the file with
+`ffmpeg -i output/final.mp4 -af ebur128=peak=true -f null -` is -14 +-0.5 LUFS; run the
+last critic round on these files.
 
-### Phase 9 — Mux
-Run `scripts/mux.sh <project>`: conform each scene video to its grid slot, concat, attach
-`audio/mix.wav` (remixing first if stale), soft-mux subtitles → `output/final.mp4`. If it warns
-that a scene render is shorter or longer than its slot, fix the scene's timing and re-render
-instead of relying on the hold/trim. A motion lesson is already one film:
-`render.sh motion <project> all high` writes `output/final.mp4` (and `final_<fmt>.mp4` per extra
-format) directly, and `render.mjs --mux` puts an existing `audio/mix.wav` into those renders.
-Before delivery run `render.sh motion <project> all verify`: every probe frame must be identical.
+### 10. Deliver
+Report: paths of every final, duration, engine, preset, formats, the final scores table
+(`manifest.json` `scores`, rounds in `docs/review_log.md`), loudness, retries per scene, and any
+unresolved critic warnings or known issues. Offer the short (or the 9:16 re-block) if
+only a lesson was made.
 
-### Phase 10 — Deliver
-Report the path to `output/final.mp4`, total duration, engine used, per-scene retry counts, and
-the final scores table (`manifest.json` `scores`, rounds in `docs/review_log.md`), and any
-unresolved critic warnings.
+## State
 
-## Resumability & state
+`manifest.json` is the run state: `phase`, `engine`, `engine_reason`, `mode`, `formats`,
+`preset`, `tts_provider`, `render_retries`, `critic_mode`, `critic_rounds`, `scores`,
+`warnings`. The storyboard stays the contract between planning and coding; re-render the same
+storyboard with another engine if needed. Mixing engines inside one video is allowed but
+discouraged; note it as a known limitation.
 
-- `scripts/new_project.sh <base-dir> <slug> [manim|remotion|motion]` creates the per-run scaffold
-  (`manifest.json`, `storyboard.json` stub, `.videogen/`, `scenes/`, `assets/`, `audio/`, `output/`);
-  with `motion` it also lays down `film/`, a starter `timeline.json` and `package.json`.
-- Treat `manifest.json` as the single source of run state; update `phase`, `engine`, retry
-  counts, TTS provider, and warnings as you go.
-- `storyboard.json` is the contract between Planner and Coder — you can re-render the same
-  storyboard with the other engine.
+## Out of scope
 
-## Scope (v1)
-
-- Mixed-engine single video is allowed but discouraged; record it as a known limitation.
-- AI text-to-video (Sora/Veo) and avatar tools (HeyGen/Synthesia) are **out of scope** — they
-  hurt educational rigor. They're noted in references as optional B-roll/presenter add-ons only.
+Text-to-video and avatar models (Sora, Veo, HeyGen and similar), scraping a product site,
+and cloud voices beyond ElevenLabs, OpenAI and local Piper.
 
 ## Reference index
 
-- `references/engine-selection.md` — Manim vs Remotion vs motion heuristics + scoring.
-- `references/motion-engine.md` — motion engine: project layout, time source (seconds, marks, cues), API, commands.
-- `references/motion-rules.md` — render contract, springs, look and rhythm rules for motion lessons.
-- `references/storyboard-schema.md` — `storyboard.json` schema + examples.
-- `references/manim-patterns.md` — Manim API snippets + error→fix table (RITL-DOC corpus).
-- `references/remotion-patterns.md` — Remotion API snippets + error→fix table (RITL-DOC corpus).
-- `references/component-library.md` — reusable templates for both engines.
-- `references/formats.md` — 16x9 / 1x1 / 4x5 / 9x16, safe areas, re-blocking, per-engine helpers.
-- `references/presets.md` — looks (chalkboard, paper, blueprint, blank): file format and how engines use it.
-- `references/verify-loop.md` — RITL + vision-critic rubric, frame sampling, retry caps, scored critic rounds.
-- `references/critique.md` — prompt for the fresh critic: 8 criteria, caps, failure modes, log format.
-- `references/tts-setup.md` — provider detection, recipes, word timings.
-- `references/audio.md` — narration grid, cues, music bed, sfx, mix, mux.
-- `references/troubleshooting.md` — Python 3.14/Manim, LaTeX, cairo/pango, ffmpeg, Chrome shell.
+- `references/engine-selection.md`: Manim vs Remotion vs motion, scoring, overrides.
+- `references/storyboard-schema.md`: `storyboard.json` (mode, formats, preset, `on` anchors).
+- `references/shorts.md`: the 30-60 s vertical short: shape, writing, captions, deriving one.
+- `references/motion-engine.md`, `references/motion-components.md`, `references/motion-rules.md`: the motion engine.
+- `references/manim-patterns.md`, `references/remotion-patterns.md`: API snippets and error-to-fix tables.
+- `references/component-library.md`: reusable scene templates for all engines.
+- `references/formats.md`, `references/presets.md`: 16x9 / 1x1 / 4x5 / 9x16, safe areas; looks and voices.
+- `references/audio.md`, `references/tts-setup.md`: narration grid, cues, music, sfx, mix, mux; providers.
+- `references/verify-loop.md`, `references/critique.md`: RITL, frame checks, the scored critic prompt.
+- `references/troubleshooting.md`: Python 3.14/Manim, LaTeX, cairo/pango, ffmpeg, Chromium.
