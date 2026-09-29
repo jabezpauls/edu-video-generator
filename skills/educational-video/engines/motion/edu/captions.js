@@ -28,7 +28,7 @@
     const cx = o.cx ?? pick(W / 2, W / 2, (W * 0.88) / 2 + W * 0.02);
     const bottom = o.bottom ?? pick(H * 0.94, H * 0.9, H * 0.74);
     const maxChars = o.maxChars || Math.max(12, Math.floor(w / (size * 0.56)));
-    const pages = CP.pages(words, { maxChars, maxLines: o.maxLines || pick(2, 2, 3), maxWords: o.maxWords || 8, hold: o.hold });
+    const pages = CP.pages(words, { maxChars, maxLines: o.maxLines || 2, maxWords: o.maxWords || 8, hold: o.hold });
     // a preset's caption style is the default: pill | plain | outline (plain with a stroke in the background colour)
     const PC = (window.PRESET && window.PRESET.captions) || {};
     const styleName = o.style || PC.style || 'pill';

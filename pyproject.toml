@@ -1,6 +1,6 @@
 [project]
 name = "educational-video-skill"
-version = "0.0.0"
+version = "2.0.0"
 description = "Dev tooling for the educational-video Claude Code skill"
 requires-python = ">=3.10"
 
