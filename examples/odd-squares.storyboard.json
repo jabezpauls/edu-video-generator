@@ -35,7 +35,7 @@
           "target": "sum"
         },
         {
-          "on": "odd",
+          "on": "first",
           "action": "highlight",
           "target": "sum"
         }
@@ -122,9 +122,9 @@
       ],
       "beats": [
         {
-          "on": "n",
           "action": "write",
-          "target": "equation"
+          "target": "equation",
+          "t": 0.1
         },
         {
           "on": "squared",
