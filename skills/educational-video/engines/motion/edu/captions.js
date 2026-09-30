@@ -60,7 +60,7 @@
           // the word being spoken: accent colour and a small pop; spoken words stay ink, upcoming ones soften
           const on = clamp(spHit(t, wd.t, 'snappy')) - clamp(sp(t, wd.e, 'snappy'));
           const upcoming = 1 - clamp(spHit(t, wd.t, 'snappy'));
-          put(s.el, { s: 1 + 0.07 * on, css: { color: E.mix(activeTone, o.color || 'ink', clamp(on) * 100), opacity: String(1 - 0.5 * upcoming) } });
+          put(s.el, { s: 1 + 0.035 * on, css: { color: E.mix(activeTone, o.color || 'ink', clamp(on) * 100), opacity: String(1 - 0.5 * upcoming) } });
         }
       });
     }
