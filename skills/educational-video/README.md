@@ -1,5 +1,7 @@
 # educational-video
 
+Version 2.0.0 (see `CHANGELOG.md` at the repository root).
+
 A Claude Code skill that makes narrated educational videos by writing and rendering code, in
 three engines, with one narration clock, a mixed soundtrack and a scored critic. Ask for a
 lesson ("explain why e^(i*pi) = -1", "animate binary search") or a short ("a 45 second short

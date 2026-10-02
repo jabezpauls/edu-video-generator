@@ -10,4 +10,3 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-extend-exclude = [".planning"]
