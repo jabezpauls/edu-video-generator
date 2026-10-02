@@ -59,3 +59,16 @@ def test_main_uses_grid_clock(sub, tmp_path, monkeypatch):
     assert sub.main() == 0
     srt = (tmp_path / "output" / "subtitles.srt").read_text()
     assert "00:00:02,000 --> 00:00:03,000" in srt and "Hello world." in srt
+
+
+def test_tall_style_is_phone_sized_and_clear_of_the_platform_zones(sub, tmp_path):
+    out = tmp_path / "t.ass"
+    words = [{"word": f"w{i}", "start": i, "end": i + 0.5} for i in range(9)]
+    sub.write_ass(out, sub.group_lines(words, sub.STYLES["tall"]["words"]), "tall")
+    text = out.read_text()
+    assert "PlayResX: 1080" in text and "PlayResY: 1920" in text
+    style = [ln for ln in text.splitlines() if ln.startswith("Style:")][0].split(",")
+    size, ml, mr, mv = int(style[2]), int(style[-4]), int(style[-3]), int(style[-2])
+    assert size >= 60
+    assert mr >= 0.12 * 1080 and mv >= 0.20 * 1920, "right UI strip and bottom 20 % stay clear"
+    assert text.count("Dialogue:") == 3   # 4 words per line

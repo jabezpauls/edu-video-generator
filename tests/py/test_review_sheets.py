@@ -47,3 +47,18 @@ def test_shade_unsafe_tints_the_zones_only(review):
     assert out.getpixel((50, 5)) != (0, 128, 0)        # top zone
     assert out.getpixel((50, 195)) != (0, 128, 0)      # bottom zone
     assert out.getpixel((95, 100)) != (0, 128, 0)      # right zone
+
+
+def test_sampled_frames_are_the_ones_the_labels_say(tmp_path):
+    """A clip whose brightness is 60 * floor(t): frame k of a 1 s sampling must be brightness 60 * k."""
+    import subprocess
+    import numpy as np
+    from conftest import load_script
+    review = load_script("review")
+    clip = tmp_path / "steps.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=30:d=5",
+                    "-vf", "geq=lum='60*floor(T)':cb=128:cr=128", "-pix_fmt", "yuv420p", str(clip)], check=True)
+    frames, step = review.grab_every(str(clip), 32, 32, 1.0)
+    assert step == 1.0 and len(frames) == 5
+    means = [round(float(f[..., 0].mean()) / 60) for f in frames]
+    assert means == [0, 1, 2, 3, 4]

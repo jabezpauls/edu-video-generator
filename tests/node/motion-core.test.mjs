@@ -127,3 +127,27 @@ test('a settled element carries no transform, a moving one does', async () => {
   ctx.seek(5);
   assert.equal(box().style.transform || '', '');
 });
+
+test('onStart hooks run before scenes build, so a hook can add a scene', async () => {
+  const ctx = loadEngine({ TL, GRID, film: (c) => {
+    c.C.onStart.push(() => c.C.scene({ name: 'extra', from: 0, to: 8, build(root, S) { S.built = true; } }));
+    c.C.start();
+  } });
+  assert.equal(await ctx.READY, true);
+  assert.deepEqual(Array.from(ctx.SCENE_TIMES, (s) => s.name), ['extra']);
+  assert.equal(ctx.C.SCENES[0].built, true);
+});
+
+test('a preset becomes the look tokens and the two font faces, loaded before frame 0', async () => {
+  const PRESET = { colors: { bg: '#1f2a24', ink: '#f4f1e8', ink2: '#b7c1b4', accent: '#ffd166', highlight: '#ff8fa3', card: '#2a372f' },
+    fonts: { display: { woff2: 'assets/fonts/display.woff2', tracking: '0.01em' }, body: { woff2: 'assets/fonts/body.woff2' } } };
+  const ctx = loadEngine({ TL, GRID, PRESET, film });
+  assert.equal(await ctx.READY, true);
+  const st = ctx.stage.style;
+  assert.equal(st['--bg'], '#1f2a24');
+  assert.equal(st['--hi'], '#ff8fa3', 'the highlight colour is the engine\'s --hi');
+  assert.equal(st['--display-tracking'], '0.01em');
+  assert.equal(st['--font-body'], 'var(--font-ui)');
+  assert.match(st['--font-ui'], /^'UI'/);
+  assert.deepEqual(ctx.loadedFaces.map((f) => [f.family, f.src]), [['Display', 'url(../assets/fonts/display.woff2)'], ['UI', 'url(../assets/fonts/body.woff2)']]);
+});

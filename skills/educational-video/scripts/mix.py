@@ -7,7 +7,8 @@
   master     -14 LUFS integrated, true peak <= -1 dBTP, 48 kHz stereo 24-bit
 
 Levels are relative to the narration, in dB (LU): music -17 under speech before ducking,
-sfx -9. Override with flags or a project-level mix.json {"music": -20, "sfx": -8, "vo": 0,
+sfx -9, each moved by the applied preset's music/sfx level_db (a preset with sfx.enabled false
+drops the sound effects). Override with flags or a project-level mix.json {"music": -20, "sfx": -8, "vo": 0,
 "duck": true, "duck_db": 8}. Only ffmpeg is needed.
 
 Usage: mix.py <project> [--music dB] [--sfx dB] [--vo dB] [--no-duck] [--target LUFS] [--stems]
@@ -18,6 +19,9 @@ import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import projectcfg  # noqa: E402
 
 SR = 48000
 DEFAULTS = {"music": -17.0, "sfx": -9.0, "vo": 0.0, "duck": True, "target": -14.0}
@@ -127,6 +131,11 @@ def master(raw, out, target):
 
 def load_levels(project, args):
     lv = dict(DEFAULTS)
+    pr = projectcfg.preset(project)
+    for k in ("music", "sfx"):
+        lv[k] += float((pr.get(k) or {}).get("level_db") or 0)
+    if (pr.get("sfx") or {}).get("enabled") is False:
+        lv["sfx_off"] = True
     mj = os.path.join(project, "mix.json")
     if os.path.isfile(mj):
         lv.update(json.load(open(mj)))
@@ -168,6 +177,8 @@ def main(argv=None):
         stems["vo"] = vo_path
     for k in ("music", "sfx"):
         p = os.path.join(adir, f"{k}.wav")
+        if k == "sfx" and lv.get("sfx_off"):
+            continue
         if os.path.isfile(p):
             stems[k] = p
     if not stems:

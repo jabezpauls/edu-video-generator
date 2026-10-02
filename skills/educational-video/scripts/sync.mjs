@@ -9,8 +9,15 @@
 //
 // The cue grid (window.GRID.cues) is where narration plugs in. It is assembled from, lowest to highest priority:
 //   1. storyboard.json, when there is no narration yet: sNN.start / sNN.end from the cumulative est_duration_s
-//   2. grid.json (written by grid.py) { duration?, scenes: [{ id, n?, start, end }], cues: { "s03.derivative": 12.31, ... } }
+//   2. grid.json (written by grid.py) { duration?, scenes: [{ id, n?, start, end, words? }], cues: { "s03.derivative": 12.31, ... } }
 // so a film written against 's02.start' or 's02.derivative' keeps working when real speech replaces the estimates.
+// film.end (always): the film's duration. A scene runs from sNN.start to the next scene's start (the last one to film.end);
+// sNN.end is where the speech stops, before the tail, so it is for anchoring a visual, not for a scene window.
+// The spoken words of every scene also become window.GRID.words ([{ w, t, e }] in seconds): the burned-in captions read them.
+//
+// Formats come from the storyboard (`formats`, else the default of its `mode`); timeline.json's own `formats` is only used
+// when there is no storyboard. Captions are burned into the formats listed in timeline.json `captions.burn` (default ["9x16"],
+// where players show no subtitle track) whenever narration words exist. An applied preset (preset.json) becomes window.PRESET.
 //
 // timeline.json:
 //   { title?, duration?, fps?, formats?, marks?: { name: when }, sfx?: [ { at, type, gain?, pitch?, pan?, what? } ] }
@@ -73,9 +80,21 @@ if (grid) {
 const lastEnd = Math.max(0, ...Object.entries(cues).filter(([k]) => k.endsWith('.end')).map(([, v]) => v));
 const duration = TL.duration ?? grid?.duration ?? (lastEnd > 0 ? lastEnd : null);
 if (!(duration > 0)) fail('no duration: set "duration" in timeline.json (or provide storyboard est_duration_s / grid.json)');
+cues['film.end'] = duration;          // the last scene's window ends here (sNN.end is the end of the SPEECH, before the tail)
 const fps = TL.fps || 60;
-const formats = TL.formats || ['16x9'];
-const tl = { ...TL, duration, fps, formats };
+// the storyboard is the contract for what gets rendered; a mode's default applies when it lists nothing
+const MODE_FORMATS = { lesson: ['16x9'], short: ['9x16'] };
+const sbFormats = storyboard && (Array.isArray(storyboard.formats) && storyboard.formats.length ? storyboard.formats : MODE_FORMATS[storyboard.mode] || null);
+const formats = sbFormats || TL.formats || ['16x9'];
+if (sbFormats && TL.formats && storyboard.scenes?.length && JSON.stringify(TL.formats) !== JSON.stringify(sbFormats)) {
+  console.warn(`sync: note: timeline.json formats ${JSON.stringify(TL.formats)} differ from storyboard.json ${JSON.stringify(sbFormats)}; using the storyboard's`);
+}
+const words = [];
+for (const sc of grid?.scenes || []) for (const w of sc.words || []) words.push({ w: w.word, t: w.start, e: w.end });
+const burn = (TL.captions && TL.captions.burn) || ['9x16'];
+const tl = { ...TL, duration, fps, formats, captions: { ...(TL.captions || {}), burn } };
+const presetFile = path.join(ROOT, 'preset.json');
+const preset = fs.existsSync(presetFile) ? JSON.parse(fs.readFileSync(presetFile, 'utf8')) : null;
 
 // ------------------------------------------------------------------ resolve (loud on any unknown name)
 const T = makeTime({ marks: TL.marks, cues, beats: beats || {}, bpm: TL.bpm });
@@ -103,23 +122,29 @@ const sfx = events.filter((e) => e.t < duration).sort((a, b) => a.t - b.t).map((
 }));
 
 // ------------------------------------------------------------------ write
-// cues.json is shared with `grid.py cues` (same shape, tagged by "source"). A plan derived from storyboard beats
-// by grid.py is kept unless the timeline declares its own sfx, which then win because they are placed on the film's marks.
-let keepGridPlan = false;
+// cues.json is shared with `grid.py cues` (same shape, tagged by "source"). The timeline's sfx are written only when it
+// declares some, and they win over a grid.py plan because they sit on the film's marks. With none declared sync writes
+// nothing, leaves a grid.py plan alone and removes a stale timeline-made file, so `grid.py cues` is never blocked by us.
 const cuesPath = path.join(ROOT, 'cues.json');
-if (fs.existsSync(cuesPath) && !(TL.sfx || []).length) {
-  try { keepGridPlan = JSON.parse(fs.readFileSync(cuesPath, 'utf8')).source === 'grid'; } catch { /* unreadable: rewrite */ }
+const declared = (TL.sfx || []).length > 0;
+let keepGridPlan = false;
+if (declared) fs.writeFileSync(cuesPath, JSON.stringify({ sr: 48000, duration, source: 'timeline', cues: sfx }, null, 1) + '\n');
+else if (fs.existsSync(cuesPath)) {
+  let src = null;
+  try { src = JSON.parse(fs.readFileSync(cuesPath, 'utf8')).source; } catch { /* unreadable: leave it */ }
+  if (src === 'grid') keepGridPlan = true;
+  else if (src === 'timeline') fs.rmSync(cuesPath);
 }
-if (!keepGridPlan) fs.writeFileSync(cuesPath, JSON.stringify({ sr: 48000, duration, source: 'timeline', cues: sfx }, null, 1) + '\n');
 fs.mkdirSync(path.join(ROOT, 'film'), { recursive: true });
-const dataGrid = { cues, scenes: sceneIds, nominal: !grid };
+const dataGrid = { cues, scenes: sceneIds, nominal: !grid, words };
 fs.writeFileSync(path.join(ROOT, 'film/data.js'),
-  `// GENERATED by scripts/sync.mjs — do not edit\nwindow.TL = ${JSON.stringify(tl)};\nwindow.GRID = ${JSON.stringify(dataGrid)};\nwindow.BEATS = ${JSON.stringify(beats || {})};\n`);
+  `// GENERATED by scripts/sync.mjs — do not edit\nwindow.TL = ${JSON.stringify(tl)};\nwindow.GRID = ${JSON.stringify(dataGrid)};\nwindow.BEATS = ${JSON.stringify(beats || {})};\nwindow.PRESET = ${JSON.stringify(preset)};\n`);
 
+if (argv.includes('--print-formats')) console.log(formats.join('\n'));
 if (!QUIET) {
   const src = grid ? `grid.json (${Object.keys(grid.cues || {}).length} cues)` : storyboard && sceneIds.length ? `storyboard estimates (${sceneIds.length} scenes, no narration grid yet)` : 'none';
-  console.log(`time: seconds · duration ${duration}s @ ${fps} fps · formats ${formats.join(', ')} · cue grid: ${src}${beats ? ' · beat grid: yes' : ''}`);
+  console.log(`time: seconds · duration ${duration}s @ ${fps} fps · formats ${formats.join(', ')} · cue grid: ${src}${words.length ? ` · ${words.length} caption words` : ''}${preset ? ` · preset ${preset.name}` : ''}${beats ? ' · beat grid: yes' : ''}`);
   for (const [k, t] of Object.entries(marks).sort((a, b) => a[1] - b[1])) console.log(`  ${t.toFixed(3).padStart(8)}s  ${k}`);
-  console.log(keepGridPlan ? 'cues.json: kept the grid.py plan (timeline declares no sfx) · film/data.js written' : `cues.json: ${sfx.length} sfx cues · film/data.js written`);
+  console.log(`${declared ? `cues.json: ${sfx.length} sfx cues from the timeline` : keepGridPlan ? 'cues.json: kept the grid.py plan (timeline declares no sfx)' : 'no timeline sfx'} · film/data.js written`);
 }
 for (const [k, t] of late) console.warn(`sync: warning: mark "${k}" is at ${t.toFixed(2)}s, outside the film (0-${duration}s)`);

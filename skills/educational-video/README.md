@@ -1,87 +1,95 @@
 # educational-video
 
-A Claude Code skill that generates high-quality, consistent **educational** videos by writing
-and rendering **code** (Manim, Remotion or the spring-driven motion engine) inside an agentic render-verify loop — rather than
-synthesizing pixels with text-to-video models, which can't hold logical/numeric/text rigor.
+Version 2.0.0 (see `CHANGELOG.md` at the repository root).
 
-## What it does
+A Claude Code skill that makes narrated educational videos by writing and rendering code, in
+three engines, with one narration clock, a mixed soundtrack and a scored critic. Ask for a
+lesson ("explain why e^(i*pi) = -1", "animate binary search") or a short ("a 45 second short
+on how a hash table works") and it plans, narrates, animates, mixes and reviews, then hands you
+`final.mp4` (and a 9:16 version when you want one).
 
-Topic or script → engine selection → storyboard → per-scene code → render → **RITL** error loop
-+ **vision-critic** layout review → TTS voiceover → word-aligned subtitles → muxed `final.mp4`.
+## What is in it
 
-Based on verified research (Code2Video tri-agent Planner/Coder/Critic; Renderer-in-the-Loop with
-doc-grounded retries raising render success to ~94%).
+- **Three engines.** Manim (math, geometry), Remotion (UI, data, branded), and **motion**, a
+  spring-driven `seek(t)` HTML engine rendered by Playwright, with ready-made lesson components
+  (KaTeX equations with per-term reveal, highlighted code, plots, diagrams and algorithm
+  stepping, word-synced captions). Pick per topic; the storyboard is the same for all.
+- **One narration grid.** Text-to-speech (ElevenLabs, OpenAI, or offline Piper) gives word times;
+  `grid.py` turns them into scene lengths and named cues (`s03.derivative`). Animations and
+  sound effects are placed on those cues, so picture and voice agree to well under 80 ms.
+- **Sound.** A quiet seeded music bed (calm, curious, upbeat), sound effects on the cues, a
+  side-chain ducked mix mastered to -14 LUFS with true peak below -1 dBTP.
+- **Formats.** 16:9, 1:1, 4:5 and 9:16, re-blocked per format rather than cropped, with the
+  9:16 platform safe zones. Soft subtitles, or word-synced burned-in captions in 9:16.
+- **Looks.** `chalkboard`, `paper`, `blueprint` presets (palette, two OFL fonts, voice, music
+  mood, caption style) plus a documented `blank` to make your own.
+- **Shorts.** 30-60 s micro-lessons: a hook inside 3 seconds, one idea, a payoff; validated
+  by the storyboard checker, motion engine by default.
+- **A critic that can say no.** `review.py` builds contact sheets, fast-action strips, phone
+  sheets and metrics from the *rendered files*; the critic scores 8 criteria with caps and
+  evidence. Strict default (3+ rounds, every score >= 8) or `--quick` (1 round, >= 7).
 
-## How to use
+## Using it
 
-Just ask, e.g.:
-- "Make a 2-minute video explaining why e^(iπ) = −1"
-- "Turn this lesson script into an animated explainer with narration"
-- "Animate how binary search works"
+Ask in plain language. The skill asks two or three questions (audience, length, lesson or
+short, format, look), writes `storyboard.json`, **stops for your approval**, then does the
+rest and reports the paths, durations, loudness and critic scores. Re-invoking resumes from
+`manifest.json`. The phases are in `SKILL.md`; the scripts are plain CLIs you can run yourself:
 
-Claude Code will invoke this skill and walk the phases in `SKILL.md`, asking 2–3 clarifying
-questions, then bootstrapping and producing the video in a project folder under your workspace.
+```bash
+S=~/.claude/skills/educational-video
+$S/scripts/new_project.sh ~/videos halving motion --short       # scaffold a 9:16 short
+$S/scripts/bootstrap.sh ~/videos/halving motion                  # venv, Piper, Playwright
+python3 $S/scripts/validate_storyboard.py ~/videos/halving
+```
+
+For better voices export `ELEVENLABS_API_KEY` or `OPENAI_API_KEY` first; otherwise Piper runs
+locally with no key.
 
 ## Requirements
 
-Present on this machine: `uv`, Python 3.14 (a pinned **3.12** venv is created for Manim — 3.14
-breaks Manim), Node/npm, ffmpeg, LaTeX (pdflatex+dvisvgm), cairo, pango.
-
-Installed on first run as needed: Manim (pip into the venv), Remotion (npm), Playwright + Chromium (motion), TTS.
-
-**Narration quality:** with no cloud key set, narration uses local **Piper** (offline). For
-better voices, set `ELEVENLABS_API_KEY` or `OPENAI_API_KEY` before running.
+`uv`, Node.js 22+ and npm, `ffmpeg`/`ffprobe`. For Manim also a LaTeX toolchain (`pdflatex`,
+`dvisvgm`) and cairo/pango. Everything else (a pinned Python 3.12 venv, Manim, Remotion,
+Playwright and Chromium, Piper and a voice, numpy/scipy/Pillow, faster-whisper for word
+alignment) is installed by `bootstrap.sh` the first time, into the project folder.
 
 ## Layout
 
 ```
-SKILL.md                  # orchestration: phases, agent roles, loops, retry caps
-references/               # knowledge corpus (read on demand)
-  engine-selection.md     # Manim vs Remotion vs motion heuristics
-  motion-engine.md        # motion engine: layout, time source, cue grid, API, commands
-  motion-rules.md         # render contract, springs and lesson rhythm for motion
-  storyboard-schema.md    # storyboard.json contract
-  manim-patterns.md       # Manim snippets + error→fix table
-  remotion-patterns.md    # Remotion snippets + error→fix table
-  component-library.md     # reusable templates (both engines)
-  verify-loop.md          # RITL + vision-critic rubric
-  formats.md              # 16x9 / 1x1 / 4x5 / 9x16, safe areas, re-blocking
-  presets.md              # looks: file format, how Manim and Remotion use them
-  tts-setup.md            # provider detection + recipes + word timings
-  audio.md                # narration grid, music bed, sfx, mix, mux
-  troubleshooting.md      # known failure modes + fixes
-engines/motion/          # the motion engine: core.js, type.js, lib/, starter lesson
-presets/                 # blank (documented), chalkboard, paper, blueprint + OFL fonts
-templates/               # helpers copied into projects: springs, formats, gridsync for Manim and Remotion; timeline.json for motion
-scripts/                 # deterministic helpers
-  bootstrap.sh            # env setup (uv venv 3.12, Manim, Remotion, TTS)
-  detect_tts.py           # resolve TTS provider → JSON
-  new_project.sh          # per-run scaffold + manifest/storyboard stubs
-  validate_storyboard.py  # storyboard validation
-  render.sh               # unified render (manim|remotion|motion), optional per-format
-  scaffold_motion.sh      # add the motion engine (film/, timeline.json) to a project
-  sync.mjs                # timeline (+ cue grid) -> film/data.js + cues.json
-  render.mjs              # motion renderer: sheets, stills, drafts, finals, clips, --verify, --mux
-  scaffold_engine.sh      # springs, formats and preset theme into a Manim/Remotion project
-  apply_preset.py         # preset -> fonts, scenes/theme.py, scenes/src/theme.ts
-  extract_frames.sh       # critic frames (ffmpeg / remotion still / motion / any mp4)
-  review.py               # scored-critic kit from rendered mp4s (sheets + metrics.json)
-  tts.py                  # per-scene narration synthesis (cached)
-  grid.py                 # narration grid: word times, scene slots, named cues, sfx plan
-  align_subtitles.py      # .srt/.ass from the grid
-  music.py                # quiet music bed (calm | curious | upbeat)
-  sfx.mjs                 # sound effects on cues
-  mix.py                  # narration + bed + sfx, ducked, -14 LUFS / -1 dBTP
-  mux.sh                  # conform scenes to the grid, mux the mix + subtitles → final.mp4
+SKILL.md                orchestration: phases 0-10, roles, loops, critic rules
+references/             read on demand
+  engine-selection.md   storyboard-schema.md   shorts.md
+  motion-engine.md      motion-components.md   motion-rules.md
+  manim-patterns.md     remotion-patterns.md   component-library.md
+  formats.md            presets.md             audio.md      tts-setup.md
+  verify-loop.md        critique.md            troubleshooting.md
+engines/motion/         the motion engine: core, type, springs, time, lesson components, vendored KaTeX
+presets/                blank, chalkboard, paper, blueprint (+ OFL fonts and licences)
+templates/              springs/formats/gridsync for Manim and Remotion, timeline.json, review_log.md,
+                        short.storyboard.json
+scripts/
+  new_project.sh bootstrap.sh detect_tts.py validate_storyboard.py   set up and plan
+  tts.py grid.py wordtimes.py align_subtitles.py                      narration, grid, subtitles
+  music.py sfx.mjs mix.py projectcfg.py                               sound
+  apply_preset.py scaffold_engine.sh scaffold_motion.sh               looks and engine helpers
+  sync.mjs render.mjs render.sh extract_frames.sh mux.sh              render and assemble
+  review.py                                                           critic kit
 ```
 
-## Per-run output
+## A project folder
 
-Created under your working dir as `<slug>/`: `manifest.json` (resumable run state),
-`storyboard.json`, `scenes/`, `audio/`, `output/{scene_*.mp4,subtitles.*,final.mp4}`, and a
-`.venv/` for Manim. Re-invoking the skill resumes from the last incomplete phase.
+```
+<slug>/
+  manifest.json storyboard.json grid.json cues.json preset.json
+  audio/        scene_<id>.wav  music.wav  sfx.wav  mix.wav  mix_report.json
+  scenes/       (Manim, Remotion)        film/ timeline.json  (motion)
+  output/       final.mp4  final_<fmt>.mp4  subtitles.srt  subtitles*.ass
+  renders/      raw motion renders       review/ r<N>/ sheets + metrics.json
+  docs/         review_log.md            .videogen/ logs, frames, env
+```
 
-## Scope (v1)
+## Limits
 
-Code-driven only. AI text-to-video (Sora/Veo) and avatars (HeyGen/Synthesia) are out of scope —
-noted as optional B-roll/presenter add-ons but not depended on.
+Code-driven only: no text-to-video or avatar models. A motion lesson is authored in JavaScript
+against the component API; heavy LaTeX derivations and geometric constructions are still
+Manim's job. English narration is the tested path. One engine per video.

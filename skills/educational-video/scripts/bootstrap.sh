@@ -135,7 +135,7 @@ if have uv; then
     uv venv --python "$PYVER" "$PROJECT/.venv" >/dev/null 2>&1 || warn "uv venv failed"
   fi
   if [[ -x "$VENV_PY" ]]; then
-    PKGS=(numpy scipy soundfile)
+    PKGS=(numpy scipy soundfile pillow)   # pillow: review.py (the critic kit) runs from this venv too
     NEED_ASR=false
     # Piper is the offline default: install it unless a cloud TTS key or a system piper exists.
     if [[ -z "${ELEVENLABS_API_KEY:-}" && -z "${OPENAI_API_KEY:-}" ]] \

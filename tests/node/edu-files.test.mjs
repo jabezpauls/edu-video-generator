@@ -35,3 +35,9 @@ test('every component file declares itself on EDU', () => {
     assert.match(readFileSync(join(ENGINE, 'edu', `${f}.js`), 'utf8'), new RegExp(`E\\.${name} = `));
   }
 });
+
+test('syntax colours are declared on #stage so a preset\'s tokens reach them', () => {
+  const css = readFileSync(join(ENGINE, 'edu/edu.css'), 'utf8');
+  assert.match(css, /#stage\s*\{[^}]*--c-fn:\s*var\(--ink\)/);
+  assert.doesNotMatch(css, /:root\s*\{[^}]*--c-/);
+});

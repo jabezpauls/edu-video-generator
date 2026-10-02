@@ -36,9 +36,10 @@ def test_modes(validator, v2, mode):
     v2["mode"] = mode
     if mode == "short":
         v2["target_duration_s"] = 45
-        for sc in v2["scenes"]:
-            sc["est_duration_s"] = 22.5
-    assert validator.manual_check(v2) == []
+        v2["scenes"][0]["est_duration_s"] = 4
+        v2["scenes"][0]["narration"] = "Why does halving win?"
+        v2["scenes"][1]["est_duration_s"] = 41
+    assert validator.manual_check(v2) == [], validator.manual_check(v2)
 
 
 def test_bad_mode(validator, v2):

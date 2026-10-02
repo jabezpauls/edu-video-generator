@@ -12,12 +12,16 @@ Moods:
   none     write nothing (and remove any old bed)
 
 Usage: music.py <project> [--mood calm|curious|upbeat|none] [--seed N] [--duration S]
+Without --mood the applied preset's music mood is used, else upbeat for a short and curious for a lesson.
 Duration comes from grid.json unless --duration is given. Needs numpy, scipy, soundfile.
 """
 import argparse
 import json
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import projectcfg  # noqa: E402
 
 SR = 48000
 BED_RMS_DB = -22.0     # loudness of the finished bed; mix.py places it relative to the voice
@@ -172,11 +176,12 @@ def boundaries_from_grid(grid):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("project")
-    ap.add_argument("--mood", default="curious", choices=[*MOODS, "none"])
+    ap.add_argument("--mood", default=None, choices=[*MOODS, "none"])
     ap.add_argument("--seed", type=int, default=4242)
     ap.add_argument("--duration", type=float)
     a = ap.parse_args(argv)
 
+    a.mood = projectcfg.music_mood(a.project, a.mood)
     out = os.path.join(a.project, "audio", "music.wav")
     if a.mood == "none":
         if os.path.isfile(out):

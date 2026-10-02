@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Copy the shared helpers (springs, formats) into a Manim or Remotion project.
 # Usage: scaffold_engine.sh <project-dir> <manim|remotion> [--force]
-#   manim:    <project>/scenes/{springs,formats}.py
-#   remotion: <project>/scenes/src/{springs.ts,formats.ts,SceneFormats.tsx}
+#   manim:    <project>/scenes/{springs,formats,gridsync}.py
+#   remotion: <project>/scenes/src/{springs.ts,formats.ts,SceneFormats.tsx,gridsync.ts}
 # Existing files are left alone unless --force is given, so scene code can edit its copy.
 # Also writes the theme (scenes/theme.py, scenes/src/theme.ts) from the storyboard's preset, or
 # from the blank preset's defaults when none is named, so scene code can always import it.
@@ -27,9 +27,11 @@ copy() {
 case "$ENGINE" in
   manim)
     for f in springs.py formats.py; do copy "$TEMPLATES/manim/$f" "$PROJECT/scenes/$f"; done
+    copy "$TEMPLATES/gridsync.py" "$PROJECT/scenes/gridsync.py"
     ;;
   remotion)
     for f in springs.ts formats.ts SceneFormats.tsx; do copy "$TEMPLATES/remotion/$f" "$PROJECT/scenes/src/$f"; done
+    copy "$TEMPLATES/gridsync.ts" "$PROJECT/scenes/src/gridsync.ts"
     ;;
   *)
     echo "unknown engine: $ENGINE (use manim or remotion)" >&2

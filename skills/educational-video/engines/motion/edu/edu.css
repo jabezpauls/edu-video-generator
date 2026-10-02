@@ -1,6 +1,8 @@
 /* Lesson components (equation, code, plot, diagram, captions). Colours come from the look tokens in index.html, so a
-   preset restyles the components too. Override --c-* to retheme syntax highlighting alone. */
-:root {
+   preset restyles the components too. Override --c-* to retheme syntax highlighting alone.
+   Declared on #stage, not :root: a preset sets --ink and friends on #stage, and a var() on :root would have been resolved
+   against the page defaults (dark code on a dark board). */
+#stage {
   --c-kw: var(--hi); --c-str: var(--accent); --c-num: var(--accent); --c-com: var(--ink-2);
   --c-fn: var(--ink); --c-op: var(--ink-2); --c-line: color-mix(in srgb, var(--hi) 14%, transparent);
   --edu-dim: 0.28;

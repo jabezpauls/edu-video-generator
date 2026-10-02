@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the educational-video skill into Claude Code's skills directory.
+# Install the educational-video skill (v2) into Claude Code's skills directory.
 #
 #   ./install.sh           # symlink the skill into ~/.claude/skills (recommended for dev)
 #   ./install.sh --copy    # copy the skill instead of symlinking
@@ -46,10 +46,17 @@ else
 fi
 
 # Friendly dependency check (non-fatal — the skill bootstraps what's missing).
-c_info "checking host tools (skill auto-installs Manim/Remotion/TTS on first run):"
-for t in uv node npm ffmpeg pdflatex; do
-  if command -v "$t" >/dev/null 2>&1; then c_ok "$t"; else c_warn "$t missing (recommended)"; fi
+c_info "checking host tools (each video project installs its own Manim, Remotion, Playwright + Chromium and Piper on first run):"
+for t in uv node npm ffmpeg ffprobe; do
+  if command -v "$t" >/dev/null 2>&1; then c_ok "$t"; else c_warn "$t missing (required)"; fi
 done
+for t in pdflatex dvisvgm; do
+  if command -v "$t" >/dev/null 2>&1; then c_ok "$t"; else c_warn "$t missing (only needed for Manim LaTeX)"; fi
+done
+if command -v node >/dev/null 2>&1; then
+  major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  [[ "$major" -ge 22 ]] || c_warn "node $major found; the motion engine and the repo tests want Node 22 or newer"
+fi
 
 echo
 c_ok "Installed. Restart Claude Code, then ask: \"make a video explaining <topic>\""

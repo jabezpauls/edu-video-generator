@@ -104,3 +104,36 @@ def test_mux_requires_grid_and_scene_videos(tmp_path):
     (p / "grid.json").unlink()
     r = mux(p)
     assert r.returncode == 1 and "grid.json missing" in r.stderr
+
+
+def test_mux_all_formats_names_the_primary_final_and_burns_9x16_captions(tmp_path):
+    p = make_project(tmp_path)
+    sb = json.loads((p / "storyboard.json").read_text())
+    sb["formats"] = ["16x9", "9x16"]
+    (p / "storyboard.json").write_text(json.dumps(sb))
+    for sid, vl in (("01", 4.0), ("02", 3.0)):
+        (p / "output" / f"scene_{sid}.mp4").rename(p / "output" / f"scene_{sid}.16x9.mp4")
+        lavfi_video(p / "output" / f"scene_{sid}.9x16.mp4", vl, size="180x320")
+    (p / "output" / "subtitles.srt").write_text("1\n00:00:00,500 --> 00:00:02,000\nHello\n")
+    (p / "output" / "subtitles_9x16.ass").write_text(
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 180\nPlayResY: 320\n\n[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, "
+        "Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        "Style: Default,Arial,16,&H00FFFFFF,&H00000000,&H80000000,0,2,1,2,10,10,60,1\n\n[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:00.50,0:00:02.00,Default,,0,0,0,,Hello\n")
+    r = mux(p, "--format", "all")
+    assert r.returncode == 0, r.stderr
+    wide, tall = p / "output" / "final.mp4", p / "output" / "final_9x16.mp4"
+    assert probe(wide, "stream=width,height")[:1] == ["320,180"] or "320,180" in probe(wide, "stream=width,height")
+    assert "180,320" in probe(tall, "stream=width,height")
+    assert "subtitle" in probe(wide, "stream=codec_type"), "16x9 keeps a soft track"
+    assert "subtitle" not in probe(tall, "stream=codec_type"), "9x16 is burned in"
+    for f in (wide, tall):
+        assert float(probe(f, "format=duration")[0]) == pytest.approx(7.0, abs=0.1)
+
+
+def test_mux_of_a_format_without_renders_says_which_render_to_run(tmp_path):
+    p = make_project(tmp_path)
+    r = mux(p, "--format", "9x16")
+    assert r.returncode == 1 and "render.sh" in r.stderr and "9x16" in r.stderr

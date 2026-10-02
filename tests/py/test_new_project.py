@@ -80,7 +80,7 @@ def test_motion_engine_scaffold(tmp_path):
     project = tmp_path / "demo"
     assert r.stdout.strip() == str(project)
     for f in ("film/index.html", "film/core.js", "film/type.js", "film/film.js", "film/data.js",
-              "film/lib/motion.js", "film/lib/time.js", "timeline.json", "cues.json",
+              "film/lib/motion.js", "film/lib/time.js", "timeline.json",
               "package.json"):
         assert (project / f).is_file(), f
     assert json.loads((project / "manifest.json").read_text())["engine"] == "motion"
@@ -144,3 +144,29 @@ def test_rejects_unknown_engine(tmp_path):
                        capture_output=True, text=True, check=False)
     assert r.returncode == 2
     assert not (tmp_path / "demo").exists()
+
+
+def test_short_starts_from_the_template_in_9x16_with_motion(tmp_path, validator):
+    r = subprocess.run(["bash", str(SCRIPT), str(tmp_path), "tip", "--short"],
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 0, r.stderr
+    p = tmp_path / "tip"
+    m = json.loads((p / "manifest.json").read_text())
+    assert (m["mode"], m["formats"], m["engine"], m["engine_reason"]) == (
+        "short", ["9x16"], "motion", "short mode default")
+    sb = json.loads((p / "storyboard.json").read_text())
+    assert sb["mode"] == "short" and len(sb["scenes"]) == 5
+    assert validator.manual_check(sb) == []
+    assert (p / "film" / "film.js").is_file(), "motion scaffold"
+
+
+def test_short_with_an_explicit_engine_keeps_it(tmp_path):
+    subprocess.run(["bash", str(SCRIPT), str(tmp_path), "tip", "remotion", "--short"],
+                   capture_output=True, text=True, check=True)
+    m = json.loads((tmp_path / "tip" / "manifest.json").read_text())
+    assert m["engine"] == "remotion" and m["mode"] == "short" and m["engine_reason"] is None
+
+
+def test_unknown_option_is_refused(tmp_path):
+    r = subprocess.run(["bash", str(SCRIPT), str(tmp_path), "x", "--wide"], capture_output=True, text=True, check=False)
+    assert r.returncode == 2 and "unknown option" in r.stderr

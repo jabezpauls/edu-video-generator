@@ -10,6 +10,8 @@
 //   --range 3,5 | --scene 02 [--blur 0]                         a clip: seconds 3-5, or one scene by storyboard id
 //   --mux [--all]                                               re-mux audio/mix.wav into existing renders without re-rendering
 //   --verify [--all]                                            determinism check: 12 probes, cold vs after seeking elsewhere
+//   --subs file.srt                                             soft subtitle track (mov_text) in the finals and in --mux; skipped for 9x16, where the
+//                                                              captions are burned into the picture by the film (needs narration words in grid.json)
 //   options: --tag name (output prefix)  --fps N  --blur 0|1 (default 1 for finals)  --crf N  --audio path (default audio/mix.wav if present)  --out file
 import http from 'node:http';
 import fs from 'node:fs';
@@ -35,7 +37,8 @@ for (const base of [path.join(ROOT, 'package.json'), path.join(process.cwd(), 'p
 }
 if (!chromium) die(`playwright not found from ${ROOT}. Run: (cd ${ROOT} && npm i -D playwright && npx playwright install chromium)`);
 
-const TL = JSON.parse(fs.readFileSync(path.join(ROOT, 'timeline.json'), 'utf8'));
+// the effective timeline (storyboard formats, narration duration) is what sync.mjs wrote into data.js, not timeline.json itself
+const TL = JSON.parse(/^window\.TL = (.*);$/m.exec(fs.readFileSync(path.join(ROOT, 'film/data.js'), 'utf8'))[1]);
 const SIZES = { '16x9': [1920, 1080], '1x1': [1080, 1080], '4x5': [1080, 1350], '9x16': [1080, 1920] };
 const ALL = TL.formats || ['16x9'];
 const FORMATS = has('all') ? ALL : [opt('fmt', ALL[0])];
@@ -44,9 +47,20 @@ const DRAFT = has('draft');
 const TAG = String(opt('tag', DRAFT ? 'draft' : '')).replace(/[^\w-]/g, '') ;   // output name prefix: renders/<tag>_<fmt>.mp4
 const AUDIO = path.resolve(ROOT, String(opt('audio', 'audio/mix.wav')));
 const hasAudio = fs.existsSync(AUDIO);
+const SUBS = has('subs') ? path.resolve(ROOT, String(opt('subs'))) : null;
+if (SUBS && !fs.existsSync(SUBS)) die(`no subtitles at ${SUBS}`);
+const subsFor = (fmt) => (SUBS && fmt !== '9x16' ? SUBS : null);
 const mkdir = (d) => fs.mkdirSync(d, { recursive: true });
 const rel = (p) => path.relative(ROOT, p);
 const run = (cmd, a) => { const r = spawnSync(cmd, a, { stdio: ['ignore', 'inherit', 'pipe'] }); if (r.status) throw new Error(`${cmd} failed: ${r.stderr}`); return r; };
+
+// A soft subtitle track goes in with a stream-copy pass of its own: as an extra input of the encode (or of the audio mux) it
+// has kept ffmpeg waiting forever. `offset` is the clip start in seconds, so the cues line up with a clip.
+function addSubs(file, subs, offset) {
+  const tmp = file + '.subs.mp4';
+  run('ffmpeg', ['-y', '-loglevel', 'error', '-i', file, '-itsoffset', String(-offset), '-i', subs, '-map', '0', '-map', '1:s', '-c', 'copy', '-c:s', 'mov_text', '-metadata:s:s:0', 'language=eng', '-movflags', '+faststart', tmp]);
+  fs.renameSync(tmp, file);
+}
 
 // ------------------------------------------------------------------ --mux: new mix into existing renders, video untouched
 if (has('mux')) {
@@ -55,7 +69,9 @@ if (has('mux')) {
     const src = path.join(ROOT, `renders/${fmt}.mp4`), tmp = src + '.tmp.mp4';
     if (!fs.existsSync(src)) die(`no render to mux into: ${rel(src)} (render it first)`);
     run('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-i', AUDIO, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', '-shortest', '-movflags', '+faststart', tmp]);
-    fs.renameSync(tmp, src); console.log('muxed', rel(src));
+    fs.renameSync(tmp, src);
+    if (subsFor(fmt)) addSubs(src, subsFor(fmt), 0);
+    console.log('muxed', rel(src));
   }
   process.exit(0);
 }
@@ -107,7 +123,7 @@ async function openFilm(fmt) {
   await page.goto(`http://127.0.0.1:${server.address().port}/film/index.html?fmt=${fmt}`);
   // a script error (unknown cue, typo in film.js) means window.READY never exists: fail with the message, not a timeout
   const ready = await Promise.race([
-    page.waitForFunction(() => window.READY, null, { timeout: 120000 }).then(() => page.evaluate(() => window.READY)),
+    page.waitForFunction(() => window.READY, null, { timeout: 120000 }).then(() => page.evaluate(() => window.READY)).catch((e) => { errors.push(String(e.message).split('\n')[0]); return false; }),
     new Promise((r) => { const i = setInterval(() => { if (errors.length) { clearInterval(i); r(false); } }, 50); }),
   ]);
   if (!ready || errors.length) { console.error(`render: the film failed to load (${fmt}):\n  ${errors.join('\n  ') || 'READY never resolved'}`); await quit(1); }
@@ -218,7 +234,7 @@ for (const fmt of FORMATS) {
     const clip = has('range') || has('scene');
     const out = path.resolve(ROOT, String(opt('out', path.join('renders', clip ? `${tag}.mp4` : `${TAG ? TAG + '_' : ''}${fmt}.mp4`))));
     mkdir(path.dirname(out));
-    const withAudio = hasAudio;
+    const withAudio = hasAudio, subs = subsFor(fmt);
     const { p, done } = ffmpeg([
       '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${F.W}x${F.H}`, '-framerate', String(fps), '-probesize', '100M', '-i', '-',
       ...(withAudio ? ['-ss', String(a), '-t', String(b - a), '-i', AUDIO] : []),
@@ -257,7 +273,8 @@ for (const fmt of FORMATS) {
       if (i % 60 === 0) process.stdout.write(`${process.stdout.isTTY ? '\r' : ''}${fmt} frame ${i}/${N}  ${((Date.now() - t0) / 1000).toFixed(0)}s${process.stdout.isTTY ? '   ' : '\n'}`);
     }
     p.stdin.end(); await done;
-    console.log(`${process.stdout.isTTY ? '\n' : ''}wrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    if (subs) addSubs(out, subs, a);
+    console.log(`${process.stdout.isTTY ? '\n' : ''}wrote ${rel(out)}  ${N} frames @ ${fps} fps${blur ? '  sub-frames ' + JSON.stringify(hist) : ''}${withAudio ? '  + ' + rel(AUDIO) : '  (silent)'}${subs ? '  + ' + rel(subs) : ''}  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }
   await F.page.close();
 }

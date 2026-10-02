@@ -1,0 +1,168 @@
+{
+  "title": "Halve the search",
+  "audience": "general",
+  "mode": "short",
+  "formats": [
+    "9x16"
+  ],
+  "preset": "blueprint",
+  "aspect_ratio": "9:16",
+  "resolution": "1080x1920",
+  "fps": 30,
+  "engine": "motion",
+  "engine_reason": "short mode default",
+  "language": "en",
+  "narration": true,
+  "target_duration_s": 36,
+  "scenes": [
+    {
+      "id": "01",
+      "title": "Hook",
+      "narration": "A million names. Twenty looks.",
+      "template": "custom",
+      "elements": [
+        {
+          "kind": "text",
+          "value": "1,000,000 names, 20 looks",
+          "position": "center"
+        }
+      ],
+      "beats": [
+        {
+          "t": 0.0,
+          "action": "pop_in",
+          "target": "hook"
+        },
+        {
+          "on": "twenty",
+          "action": "highlight",
+          "target": "20",
+          "sfx": "thump"
+        }
+      ],
+      "est_duration_s": 3.5,
+      "assets": []
+    },
+    {
+      "id": "02",
+      "title": "The idea",
+      "narration": "Binary search checks the middle, then throws away half.",
+      "template": "custom",
+      "elements": [
+        {
+          "kind": "text",
+          "value": "Check the middle. Drop half.",
+          "position": "center"
+        }
+      ],
+      "beats": [
+        {
+          "t": 0.0,
+          "action": "slide_in",
+          "target": "idea"
+        },
+        {
+          "on": "half",
+          "action": "highlight",
+          "target": "half"
+        }
+      ],
+      "est_duration_s": 4.9,
+      "assets": []
+    },
+    {
+      "id": "03",
+      "title": "Watch it work",
+      "narration": "Say we want fifty six in this sorted list. Look at the middle: twelve. Too small, so everything left of it is gone. Look again: twenty three. Still too small, so go right. Thirty eight. Right again. Fifty six. Found it in four looks.",
+      "template": "custom",
+      "elements": [
+        {
+          "kind": "shape",
+          "shape": "array",
+          "label": "2 5 8 12 16 23 38 56",
+          "position": "center"
+        }
+      ],
+      "beats": [
+        {
+          "t": 0.0,
+          "action": "pop_in",
+          "target": "array"
+        },
+        {
+          "on": "twelve",
+          "action": "highlight",
+          "target": "12"
+        },
+        {
+          "on": "twenty",
+          "action": "highlight",
+          "target": "23"
+        },
+        {
+          "on": "thirty",
+          "action": "highlight",
+          "target": "38"
+        },
+        {
+          "on": "fifty#2",
+          "action": "highlight",
+          "target": "56",
+          "sfx": "chime"
+        }
+      ],
+      "est_duration_s": 18.9,
+      "assets": []
+    },
+    {
+      "id": "04",
+      "title": "Payoff",
+      "narration": "Each look halves the list. So a million names take just twenty looks.",
+      "template": "custom",
+      "elements": [
+        {
+          "kind": "equation",
+          "tex": "\\log_2 1{,}000{,}000 \\approx 20",
+          "position": "center"
+        }
+      ],
+      "beats": [
+        {
+          "t": 0.0,
+          "action": "write",
+          "target": "equation"
+        },
+        {
+          "on": "twenty",
+          "action": "highlight",
+          "target": "20",
+          "sfx": "chime"
+        }
+      ],
+      "est_duration_s": 6.0,
+      "assets": []
+    },
+    {
+      "id": "05",
+      "title": "Recap",
+      "narration": "Halve it, again and again.",
+      "template": "custom",
+      "elements": [
+        {
+          "kind": "text",
+          "value": "Halve. Again.",
+          "position": "center"
+        }
+      ],
+      "beats": [
+        {
+          "t": 0.0,
+          "action": "pop_in",
+          "target": "recap"
+        }
+      ],
+      "est_duration_s": 3.0,
+      "assets": []
+    }
+  ]
+}

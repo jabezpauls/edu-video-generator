@@ -88,21 +88,21 @@ Modes (record in `manifest.json` as `critic_mode`):
 | `--quick` | 1 | every score >= 7 |
 
 Each round:
-1. `<project>/.venv/bin/python scripts/review.py <N> --project <project>` (or
-   `uv run --with numpy --with pillow python scripts/review.py ...` when there is no venv) builds `review/r<N>/`: contact sheets,
+1. `<project>/.venv/bin/python scripts/review.py <N> <project>` (bootstrap puts numpy and Pillow in that venv; with no
+   venv: `uv run --with numpy --with pillow python scripts/review.py <N> <project>`) builds `review/r<N>/`: contact sheets,
    fast-action strips, phone sheets at 360 px per format, `safe_9x16.jpg`, `metrics.json`.
-   Renders are discovered in `renders/` and `output/`; pass `--video <fmt>=<file>` otherwise.
+   Renders are discovered in `renders/` and `output/` (`final.mp4` is the first format, `final_<fmt>.mp4` the others); pass `--video <fmt>=<file>` otherwise.
    `cues.json` / `grid.json`, when present, add cue-to-picture sync; without them that metric is
    skipped and the critic judges sync by eye. Use `--mode short` for shorts (tighter thresholds).
-2. Spawn a FRESH critic subagent (one that did not write the lesson, and a new one each
+2. Spawn a FRESH critic subagent when you can (one that did not write the lesson, and a new one each
    round) with `references/critique.md`, the project path and the round number. It looks at every
    image, reads `metrics.json`, scores the 8 criteria and appends the round to
    `docs/review_log.md` in the exact format given there.
 3. Update the manifest: `critic_rounds` += 1, `scores` = the latest round's scores, `critic_mode`.
 4. Verdict SHIP per the table above, else fix the critic's 3 worst problems (smallest edits;
    re-run RITL for any scene touched), re-render, and go to the next round.
-5. A critic that cannot be spawned: do the round yourself using the same file, keep its voice and
-   do not defend the code.
+5. A critic that cannot be spawned: do the round yourself from the kit alone using the same file (Read every sheet),
+   keep its voice and do not defend the code.
 
 Rules that keep the loop honest:
 - Scores come from the critic, never from the Coder. Do not argue a score up; fix the picture.

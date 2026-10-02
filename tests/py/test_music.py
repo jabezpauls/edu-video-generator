@@ -69,3 +69,13 @@ def test_cli_needs_a_duration(tmp_path):
     r = subprocess.run([sys.executable, str(SCRIPTS / "music.py"), str(tmp_path)],
                        capture_output=True, text=True)
     assert r.returncode == 1 and "grid.json" in r.stderr
+
+
+def test_mood_comes_from_the_flag_then_the_preset_then_the_mode(tmp_path):
+    cfg = load_script("projectcfg")
+    assert cfg.music_mood(str(tmp_path)) == "curious"
+    (tmp_path / "storyboard.json").write_text('{"mode": "short"}')
+    assert cfg.music_mood(str(tmp_path)) == "upbeat"
+    (tmp_path / "preset.json").write_text('{"music": {"mood": "calm"}}')
+    assert cfg.music_mood(str(tmp_path)) == "calm"
+    assert cfg.music_mood(str(tmp_path), "none") == "none"

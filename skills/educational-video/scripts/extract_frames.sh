@@ -49,7 +49,7 @@ elif [[ "$ENGINE" == "video" ]]; then
 elif [[ "$ENGINE" == "motion" ]]; then
   FMT="${FMT:-$ENV_FMT}"   # 5th arg, or FMT= in the environment
   if [[ "$ID" == "all" ]]; then
-    FMT="${FMT:-$(python3 -c "import json,sys; print((json.load(open(sys.argv[1])).get('formats') or ['16x9'])[0])" "$PROJECT/timeline.json" 2>/dev/null || echo 16x9)}"
+    FMT="${FMT:-$(python3 -c "import json,sys; import re; print(json.loads(re.search(r'^window.TL = (.*);\$', open(sys.argv[1]).read(), re.M).group(1)).get('formats', ['16x9'])[0])" "$PROJECT/film/data.js" 2>/dev/null || echo 16x9)}"
     VID=""
     for cand in "$PROJECT/renders/$FMT.mp4" "$PROJECT/renders/preview_$FMT.mp4" "$PROJECT/renders/draft_$FMT.mp4"; do
       [[ -f "$cand" ]] && { VID="$cand"; break; }

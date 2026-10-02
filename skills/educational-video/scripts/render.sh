@@ -4,13 +4,13 @@
 #   format (manim/remotion): 16x9 | 1x1 | 4x5 | 9x16 | all (every format in the storyboard). Omitted = 16x9 as
 #   before. With a format, output is output/scene_<id>.<format>.mp4; without, scene_<id>.mp4.
 #   For motion, a single format picks the format of a one-scene render (same as FMT=); `all` renders every
-#   format in timeline.json.
+#   format of the storyboard (timeline.json when there is none).
 # Manim scenes:    scenes/scene_<id>.py  with class Scene<Id>
 # Remotion scenes: composition id Scene<Id> (16x9) / Scene<Id>-<format> registered in src/Root.tsx
 # Output: <project>/output/scene_<id>.mp4  (logs to .videogen/logs/)
 #
 # Motion lessons are ONE film (film/film.js + timeline.json), rendered by render.mjs; this script delegates:
-#   render.sh motion <project> all   low|med|high   every format in timeline.json -> renders/, then output/
+#   render.sh motion <project> all   low|med|high   every format of the storyboard -> renders/, then output/
 #   render.sh motion <project> <id>  low|med|high   one scene (film scene "s<id>") of the first format -> output/scene_<id>.mp4
 #   quality: low = 30 fps draft, med = 30 fps no blur CRF 18, high = 60 fps with adaptive motion blur (final)
 #   extra modes for motion: `verify` (determinism check of every format) and `sheet` (contact sheets)
@@ -97,13 +97,16 @@ render_motion() {
     *) echo "unknown quality for motion: $Q (low|med|high|verify|sheet)" >&2; return 2;;
   esac
   : > "$log"
+  ensure_preset "$abs" >>"$log" 2>&1 || { tail -n 3 "$log" >&2; return 1; }
   echo ">> sync + render.mjs $Q ($scene)" | tee -a "$log"
   node "$here/sync.mjs" --project "$abs" --quiet >>"$log" 2>&1 || { tail -n 5 "$log" >&2; return 1; }
   local -a formats
-  mapfile -t formats < <(node -e "const t=JSON.parse(require('fs').readFileSync(process.argv[1]+'/timeline.json','utf8'));console.log((t.formats||['16x9']).join('\\n'))" "$abs")
+  mapfile -t formats < <(node "$here/sync.mjs" --project "$abs" --quiet --print-formats)
   local first="${formats[0]}"
   local rc=0
   if [[ "$scene" == "all" ]]; then
+    # soft subtitles ride along in every format but 9x16 (there the film burns word-synced captions into the picture)
+    [[ "$Q" != "verify" && "$Q" != "sheet" && -f "$abs/output/subtitles.srt" ]] && flags+=(--subs "$abs/output/subtitles.srt")
     node "$here/render.mjs" --project "$abs" --all "${flags[@]}" >>"$log" 2>&1 || rc=$?
     if [[ $rc -eq 0 && "$Q" != "verify" && "$Q" != "sheet" ]]; then
       local fmt name
@@ -121,6 +124,16 @@ render_motion() {
   [[ "$Q" == "verify" || "$Q" == "sheet" ]] && grep -v '^>>' "$log"
   if [[ $rc -ne 0 ]]; then echo "motion render failed (see $log):" >&2; tail -n 8 "$log" >&2; fi
   return $rc
+}
+
+# the storyboard's preset must be the one applied to the project (apply_preset.py writes preset.json + fonts)
+ensure_preset() {
+  local proj="$1" want have
+  want="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" "$proj/storyboard.json" 2>/dev/null || true)"
+  have="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('preset') or '')" "$proj/manifest.json" 2>/dev/null || true)"
+  [[ -z "$want" || ( "$want" == "$have" && -f "$proj/preset.json" ) ]] && return 0
+  echo ">> applying preset $want"
+  python3 "$(dirname "${BASH_SOURCE[0]}")/apply_preset.py" "$want" "$proj"
 }
 
 have_node() { command -v node >/dev/null 2>&1 || { echo "node not found" >&2; return 1; }; }

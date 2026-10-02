@@ -1,123 +1,96 @@
 # Educational Video Generator
 
-> A **Claude Code skill** that turns any topic into a narrated, subtitled **educational video** —
-> using **code-driven animation** (Manim, Remotion + the motion engine) inside an agentic *render → verify → fix*
-> loop. Built for math, physics, CS, and algorithm explainers where correctness matters.
+A **Claude Code skill** that turns a topic into a narrated, captioned **educational video** or a
+vertical **short**, by writing and rendering code (Manim, Remotion or a spring-driven motion
+engine) instead of generating pixels. Built for math, physics, CS and algorithm explainers
+where an equation or a number on screen has to be right.
 
-Keywords: educational video generation · AI video generator · Manim · Remotion · Claude Code
-skill · text-to-video alternative · explainer videos · 3Blue1Brown-style animation.
+Version 2.0.0. See `CHANGELOG.md`.
 
----
+## Why code, not text-to-video
 
-## Why code-driven (not text-to-video)?
-
-End-to-end text-to-video models (Sora, Veo, Runway, Kling) score poorly on **educational**
-content — they can't hold logical, numeric, or textual rigor (equations drift, labels are wrong).
-This skill instead has the LLM **write and render code**, then a vision **critic** inspects the
-rendered frames and drives fixes. Based on the verified research pattern (Code2Video tri-agent
-Planner/Coder/Critic + Renderer-in-the-Loop with doc-grounded retries → ~94% render success).
+Text-to-video models cannot hold logical, numeric or textual rigor: equations drift and labels
+are wrong. Here the model writes the storyboard and the animation code, a renderer produces the
+frames, and a critic looks at the *rendered* output and decides what to fix. Every number on screen is the
+one in the storyboard.
 
 ## What you get
 
-Ask in plain language → the skill produces a finished `final.mp4`:
-
 ```
-topic / script
-   └─► engine selection (Manim, Remotion or motion)
-        └─► storyboard.json
-             └─► per-scene code  ──► render ──► RITL error loop + vision critic
-                                                      └─► TTS voiceover ──► word-aligned subtitles
-                                                                              └─► muxed final.mp4
+topic or script
+  -> storyboard.json  (you approve it)
+  -> narration (Piper, or ElevenLabs / OpenAI) -> one word-level grid with named cues
+  -> code in Manim | Remotion | motion, placed on the cues
+  -> render loop (error retries, frame checks, determinism check)
+  -> music bed + sound effects + mix at -14 LUFS
+  -> scored critic rounds on the rendered files (8 criteria, caps, evidence)
+  -> final.mp4 (+ 9:16, 1:1, 4:5), soft subtitles or burned-in captions
 ```
 
-- **Three co-equal engines:** Manim (Python — math/geometry/algorithms), Remotion (React/TSX —
-  UI/text/data/branded explainers) and **motion** (a spring-driven `seek(t)` engine in HTML/JS —
-  concept explainers, algorithm stepping, kinetic type, multi-format), auto-selected per topic.
-- **Full pipeline:** visuals + voiceover + subtitles + a quiet music bed and sound effects,
-  all on one word-level narration grid, mastered to -14 LUFS and muxed.
-- **Self-correcting:** deterministic error retries + a vision critic that catches overlap,
-  off-screen, illegible text, and bad timing.
-- **Per-run TTS:** uses ElevenLabs/OpenAI if a key is set, else local **Piper** (offline).
-- **Auto-bootstrap:** creates a project scaffold + a pinned Python 3.12 venv and installs what's
-  missing on first run.
+- **Three engines.** Manim for math and geometry, Remotion for UI/data/branded work, and the
+  **motion engine** (HTML + closed-form springs, rendered frame by frame with Playwright) for
+  concept explainers, algorithm stepping, kinetic type and shorts. It ships lesson components:
+  KaTeX equations revealed term by term, highlighted code, plots, diagrams and word-synced captions.
+- **Picture and sound on one clock.** Scene lengths and every animation come from the spoken
+  words, so things appear as they are said.
+- **Looks and formats.** Presets (`chalkboard`, `paper`, `blueprint`, `blank`) with OFL fonts;
+  16:9, 1:1, 4:5 and 9:16, re-blocked per format with the 9:16 safe zones respected.
+- **Shorts.** 30-60 s vertical micro-lessons with a hook inside three seconds.
+- **Offline by default.** Piper speaks, no API key needed; a key unlocks better voices.
 
 ## Install
 
-**Requirements:** `uv`, Node.js + npm, `ffmpeg`, and (for Manim math) a LaTeX toolchain
-(`pdflatex` + `dvisvgm`), plus cairo/pango. Manim, Remotion, and TTS are installed automatically
-on first run.
+Requirements: `uv`, Node.js 22+, `ffmpeg`; for Manim also `pdflatex` + `dvisvgm`, cairo and
+pango. Everything else is installed into each project folder on first use.
 
 ```bash
-git clone https://github.com/<your-username>/educational-video-generator.git
+git clone <this repository>
 cd educational-video-generator
-./install.sh            # symlink the skill into ~/.claude/skills (use --copy to copy instead)
+./install.sh            # symlink the skill into ~/.claude/skills (--copy to copy, --uninstall)
 ```
 
-`install.sh` links `skills/educational-video` into `~/.claude/skills/`, making it available to
-Claude Code. Restart Claude Code (or start a new session) and the skill is discoverable.
+Restart Claude Code, then ask for a video. `install.sh` checks the host tools (Node 22+ for the
+motion engine's Playwright, ffmpeg, uv, LaTeX) and tells you what is missing. The motion
+engine's npm dependencies (Playwright, Chromium) and Piper are installed per project by the
+skill's `bootstrap.sh`.
 
-> Manual install: copy or symlink `skills/educational-video/` into `~/.claude/skills/`.
+## Use
 
-## Usage
+- "Make a 2-minute video explaining why e^(i*pi) = -1"
+- "Animate how binary search works, chalkboard look, with a 9:16 version"
+- "Make a 45 second short on why the sum of odd numbers is a square"
+- "Add narration and captions to this animation"
 
-Just ask Claude Code naturally:
+The skill asks two or three questions, writes the storyboard and **waits for your approval**
+before spending render time. Add "quick" for a one-round review. Re-invoking resumes the run.
+Worked storyboards are in `examples/`: `odd-squares.storyboard.json` (a lesson) and
+`halving.storyboard.json` (a short).
 
-- *"Make a 2-minute video explaining why e^(iπ) = −1"*
-- *"Turn this lesson script into an animated explainer with narration"*
-- *"Animate how binary search works"*
-- *"Create a Remotion video walking through this API"*
-
-The skill asks 2–3 clarifying questions (duration, audience, narration), then bootstraps and
-produces the video in a project folder under your working directory. Re-invoking resumes from the
-last incomplete phase (state lives in `manifest.json`).
-
-**Better narration (optional):** set `ELEVENLABS_API_KEY` or `OPENAI_API_KEY` before running for
-higher-quality voices; otherwise local Piper is used.
-
-## Repository structure
+## Repository
 
 ```
-educational-video-generator/
-├── README.md                 # you are here
-├── install.sh                # link/copy the skill into ~/.claude/skills
-├── tests/                    # node --test + pytest suites
-├── .github/workflows/        # CI
-├── .gitignore
-└── skills/
-    └── educational-video/
-        ├── SKILL.md          # orchestration: phases, agent roles, loops, retry caps
-        ├── README.md         # skill-specific docs
-        ├── references/       # knowledge corpus (engine selection, schemas, patterns, verify loop, TTS, audio, troubleshooting)
-        └── scripts/          # bootstrap, render, frame-extract, TTS, narration grid, music, sfx, mix, subtitle align, mux
+install.sh   CHANGELOG.md   examples/   tests/   .github/workflows/ci.yml
+skills/educational-video/   SKILL.md  README.md  references/  engines/motion/  presets/  templates/  scripts/
 ```
+
+`skills/educational-video/README.md` describes the skill's contents and the project layout.
 
 ## Development
 
 ```bash
-npm test                                   # node --test tests/node
-uv run --with pytest pytest tests/py       # or: python -m pytest tests/py
-shellcheck -x install.sh skills/educational-video/scripts/*.sh
+npm test                                                    # node --test tests/node (Node >= 22.18)
+uv run --with pytest --with numpy --with pillow --with scipy --with soundfile pytest tests/py
+uvx --from shellcheck-py shellcheck -x install.sh skills/educational-video/scripts/*.sh
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same three checks. The tests never render video; they
-cover the storyboard validator (old and current schema), project scaffolding, subtitle
-formatting, TTS detection and the shell script guards.
-
-## How it works (the loops)
-
-- **RITL (Renderer-in-the-Loop):** render → on error, retrieve the failing-symbol doc snippet →
-  minimal patch → re-render (≤5 tries/scene).
-- **Vision critic:** extract beat frames → read them as images → check overlap / safe-area /
-  legibility (incl. LaTeX rendered) / composition / timing → route targeted fixes (≤3 passes).
-- **Guardrails:** ≤40 cumulative re-renders/run, ≤6 critic frames/scene; soft-fail keeps best
-  effort and reports warnings.
+CI runs the same on Node 22 and 24 and Python 3.10 and 3.12. The tests do not render video,
+apart from tiny synthetic clips for the critic metrics, the mixer and the muxer.
 
 ## Scope
 
-Code-driven only (v1). AI text-to-video (Sora/Veo) and avatar tools (HeyGen/Synthesia) are out of
-scope — they reduce educational rigor — but are noted as optional B-roll/presenter add-ons.
+Code-driven only. Text-to-video, avatar models and product-site capture are out of scope.
 
-## Suggested GitHub topics
+## Third-party files
 
-`claude-code` · `claude-skill` · `educational-video` · `video-generation` · `manim` · `remotion`
-· `text-to-video` · `ai-video` · `explainer-videos` · `animation`
+The bundled preset fonts are SIL OFL (licence texts sit next to them in `presets/*/fonts/`) and
+KaTeX is MIT (`engines/motion/vendor/katex/LICENSE`).

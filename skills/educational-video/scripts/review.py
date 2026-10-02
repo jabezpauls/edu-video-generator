@@ -2,6 +2,7 @@
 """Build the critique kit for a lesson from its RENDERED mp4s (any engine).
 
     python3 review.py <round> [--project DIR] [--draft] [--video fmt=path ...]
+    python3 review.py <round> <project-dir>             (the project may also be the second argument)
                       [--mode lesson|short] [--grid FILE] [--cues FILE]
 
 Needs numpy and Pillow: use the project venv (`.venv/bin/python review.py ...`, Manim brings both)
@@ -103,12 +104,14 @@ def find_videos(project, draft=False, explicit=None):
             if os.path.isfile(p):
                 found[fmt] = p
                 break
-    if not found and not draft:
+    if not draft:
+        # mux.sh / render.sh name the primary format output/final.mp4 and the others final_<fmt>.mp4: name the
+        # unsuffixed one by its aspect ratio so it joins the others instead of hiding behind them
         for rel in ("output/final.mp4", "final.mp4"):
             p = os.path.join(project, rel)
             if os.path.isfile(p):
                 w, h, *_ = probe(p)
-                found[format_of(w, h)] = p
+                found.setdefault(format_of(w, h), p)
                 break
     return found
 
@@ -308,6 +311,21 @@ def grab(path, w, h, fps=None, start=None, count=None):
     return np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3)
 
 
+def grab_every(path, w, h, step):
+    """Frames at 0, step, 2*step ... of a constant-frame-rate render: (frames, actual step in seconds).
+
+    Picks every K-th frame by index instead of using ffmpeg's fps filter, which returns the frame about half a
+    step AFTER the nominal time (a sheet labelled 33.0 s then shows 33.5 s). The step is rounded to a whole
+    number of frames, and the rounded value is what the sheets are labelled with.
+    """
+    fps = probe(path)[2]
+    k = max(1, round(step * fps))
+    cmd = ["ffmpeg", "-v", "error", "-i", path, "-vf", f"select='not(mod(n,{k}))',scale={w}:{h}:flags=area",
+           "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+    raw = run(cmd).stdout
+    return np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3), k / fps
+
+
 def tile(ims, cols, labels, out, pad=6, lab=22, bg=(20, 20, 20), font=None):
     font = font or load_font(15)
     w, h = ims[0].size
@@ -335,7 +353,7 @@ def sampled_sheets(path, out_dir, base, tw, th, cols, per_sheet, base_fps, max_s
     still fits in a handful of images. Returns (paths, seconds_between_frames).
     """
     step = max(1.0 / base_fps, dur / (per_sheet * max_sheets))
-    frames = grab(path, tw, th, fps=1.0 / step)
+    frames, step = grab_every(path, tw, th, step)
     chunks = [list(range(i, min(i + per_sheet, len(frames)))) for i in range(0, len(frames), per_sheet)]
     paths = []
     for p, idx in zip(sheet_paths(out_dir, base, len(chunks)), chunks):
@@ -654,7 +672,8 @@ def parse_args(argv):
     import argparse
     ap = argparse.ArgumentParser(description="Build the lesson critique kit from rendered mp4s.")
     ap.add_argument("round", nargs="?", default="1")
-    ap.add_argument("--project", default=".", help="project root (default: cwd)")
+    ap.add_argument("project_dir", nargs="?", help="project root, like the other scripts take it (same as --project)")
+    ap.add_argument("--project", default=None, help="project root (default: cwd)")
     ap.add_argument("--draft", action="store_true", help="read draft_<fmt>.mp4 renders")
     ap.add_argument("--video", action="append", default=[], metavar="FMT=PATH",
                     help="use this mp4 for a format instead of discovering one (repeatable)")
@@ -666,7 +685,7 @@ def parse_args(argv):
 
 def main(argv=None):
     a = parse_args(sys.argv[1:] if argv is None else argv)
-    project = os.path.abspath(a.project)
+    project = os.path.abspath(a.project or a.project_dir or ".")
     explicit = {}
     for spec in a.video:
         fmt, _, p = spec.partition("=")

@@ -72,3 +72,33 @@ def test_cli_synthesizes_once_then_skips_unchanged(tmp_path):
     (tmp_path / "storyboard.json").write_text(json.dumps(sb))
     run()
     assert len(calls.read_text().split()) == 3
+
+
+def _fake_piper(tmp_path):
+    fake = tmp_path / "piper"
+    fake.write_text("#!/bin/sh\necho \"$@\" >> " + str(tmp_path / "args.txt") + "\ncat >/dev/null\n"
+                    "while [ $# -gt 0 ]; do [ \"$1\" = --output_file ] && out=$2; shift; done\n"
+                    "printf RIFF > \"$out\"\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    (tmp_path / ".videogen").mkdir()
+    (tmp_path / ".videogen" / "env.json").write_text(json.dumps({"tts": {"provider": "piper", "bin": str(fake)}}))
+    (tmp_path / "storyboard.json").write_text(json.dumps({"scenes": [{"id": "01", "narration": "Hello there."}]}))
+
+
+def test_the_presets_piper_voice_is_used_when_it_is_downloaded(tmp_path):
+    _fake_piper(tmp_path)
+    (tmp_path / "preset.json").write_text(json.dumps({"voice": {"piper": "en_GB-alan-medium"}}))
+    (tmp_path / "assets" / "tts").mkdir(parents=True)
+    (tmp_path / "assets" / "tts" / "en_GB-alan-medium.onnx").write_text("x")
+    r = subprocess.run([sys.executable, str(SCRIPTS / "tts.py"), str(tmp_path)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "en_GB-alan-medium.onnx" in (tmp_path / "args.txt").read_text()
+
+
+def test_a_preset_voice_that_is_not_downloaded_falls_back_with_a_warning(tmp_path):
+    _fake_piper(tmp_path)
+    (tmp_path / "preset.json").write_text(json.dumps({"voice": {"piper": "en_GB-alan-medium"}}))
+    r = subprocess.run([sys.executable, str(SCRIPTS / "tts.py"), str(tmp_path)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "en_GB-alan-medium is not in assets/tts" in r.stderr
+    assert "en_US-amy-medium.onnx" in (tmp_path / "args.txt").read_text()

@@ -16,6 +16,8 @@
     --bg: #f6f5f1; --ink: #121212; --ink-2: #55534e; --accent: #e8552b; --hi: #1f6fb2; --card: #ffffff;
     --font-display: 'Display', 'Helvetica Neue', Arial, sans-serif;
     --font-ui: 'UI', 'Helvetica Neue', Arial, sans-serif;
+    --font-body: var(--font-ui);                 /* the name presets use for the second face */
+    --display-tracking: -0.04em;
     --font-mono: 'Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   }
   html, body { margin: 0; background: #000; overflow: hidden; }
@@ -24,7 +26,7 @@
            -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
   .scene { position: absolute; inset: 0; overflow: hidden; }
   .abs { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-  .display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.04em;
+  .display { font-family: var(--font-display); font-weight: 600; letter-spacing: var(--display-tracking);
              line-height: 0.95; white-space: nowrap; }
   .mono { font-family: var(--font-mono); }
   /* a line is a mask: words rise through it. Padding keeps descenders; start words >= 140% below so no sliver shows. */

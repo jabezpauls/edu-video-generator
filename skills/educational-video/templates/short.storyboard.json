@@ -1,0 +1,90 @@
+{
+  "title": "[One idea in a sentence]",
+  "audience": "general",
+  "mode": "short",
+  "formats": ["9x16"],
+  "preset": null,
+  "aspect_ratio": "9:16",
+  "resolution": "1080x1920",
+  "fps": 30,
+  "engine": "motion",
+  "engine_reason": "short mode default",
+  "language": "en",
+  "narration": true,
+  "target_duration_s": 45,
+  "scenes": [
+    {
+      "id": "01",
+      "title": "Hook",
+      "narration": "[A question or a claim.]",
+      "template": "custom",
+      "elements": [
+        { "kind": "text", "value": "[The hook, as big as the frame allows]", "position": "center" }
+      ],
+      "beats": [
+        { "t": 0.0, "action": "pop_in", "target": "hook" }
+      ],
+      "est_duration_s": 4,
+      "assets": []
+    },
+    {
+      "id": "02",
+      "title": "The idea",
+      "narration": "[State the one idea in plain words. One or two short sentences.]",
+      "template": "custom",
+      "elements": [
+        { "kind": "text", "value": "[The idea, as a short line]", "position": "top" },
+        { "kind": "shape", "shape": "rect", "label": "[the thing the idea is about]", "position": "center" }
+      ],
+      "beats": [
+        { "t": 0.0, "action": "slide_in", "target": "[the idea]" },
+        { "on": "p2", "action": "highlight", "target": "[the thing]" }
+      ],
+      "est_duration_s": 13,
+      "assets": []
+    },
+    {
+      "id": "03",
+      "title": "Show it",
+      "narration": "[Walk one concrete example, one step per sentence.]",
+      "template": "custom",
+      "elements": [
+        { "kind": "equation", "tex": "[the one formula or number that matters]", "position": "center" }
+      ],
+      "beats": [
+        { "t": 0.0, "action": "write", "target": "equation" },
+        { "on": "p2", "action": "indicate", "target": "equation", "sfx": "chime" }
+      ],
+      "est_duration_s": 15,
+      "assets": []
+    },
+    {
+      "id": "04",
+      "title": "Payoff",
+      "narration": "[The result: what the learner can now do or see.]",
+      "template": "custom",
+      "elements": [
+        { "kind": "text", "value": "[The payoff, one line]", "position": "center" }
+      ],
+      "beats": [
+        { "t": 0.0, "action": "pop_in", "target": "payoff", "sfx": "thump" }
+      ],
+      "est_duration_s": 8,
+      "assets": []
+    },
+    {
+      "id": "05",
+      "title": "Recap",
+      "narration": "[Restate the idea in six words or fewer.]",
+      "template": "custom",
+      "elements": [
+        { "kind": "text", "value": "[The idea again]", "position": "center" }
+      ],
+      "beats": [
+        { "t": 0.0, "action": "fade_in", "target": "recap" }
+      ],
+      "est_duration_s": 5,
+      "assets": []
+    }
+  ]
+}
