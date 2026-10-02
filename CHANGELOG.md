@@ -46,4 +46,9 @@ A rewrite of the skill around one narration clock, a third engine and a scored c
 - The motion film rendered the timeline's formats instead of the storyboard's; `cues.json` was
   written empty and blocked the sfx plan; the critic did not find a primary `final.mp4` next to
   `final_<fmt>.mp4`; `gridsync` was never copied into Manim/Remotion projects.
+- Contact and phone sheets were labelled half a step too early (ffmpeg's `fps` filter returns the frame after the
+  nominal time); `review.py` now samples by frame index.
+- Code syntax colours ignored a preset (dark code on a dark board); caption pages could climb three lines into the
+  content on tall frames, and the spoken-word pop closed the gap between words.
+- Soft subtitles added as an extra encode input hung ffmpeg; they are added in a stream-copy pass.
 - `uv.lock` is no longer tracked. CI runs on Node 22 and 24 so the TypeScript parity tests run.
